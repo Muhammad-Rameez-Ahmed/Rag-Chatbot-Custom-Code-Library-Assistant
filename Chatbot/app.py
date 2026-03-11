@@ -260,7 +260,7 @@ Ensure all generated code perfectly fits into my Angular project and uses my cus
 # ---------- GROQ CLIENT ----------
 
 client = AsyncGroq(
-    api_key="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"  # Yahan apni Groq key daalo
+    api_key=os.environ.get("GROQ_API_KEY")  # Yahan apni Groq key daalo
 )
 
 # ---------- DOCUMENT LOADING ----------
