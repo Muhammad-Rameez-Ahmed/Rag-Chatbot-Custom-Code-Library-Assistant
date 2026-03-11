@@ -1,0 +1,416 @@
+import { CommonModule } from '@angular/common';
+import {
+  Component,
+  AfterViewInit,
+  ViewContainerRef,
+  inject,
+  ChangeDetectionStrategy,
+  viewChild,
+  signal,
+  ComponentRef
+} from '@angular/core';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatIconModule } from '@angular/material/icon';
+import {
+  LibMatIconButtonComponent, LibMatFlatButtonComponent, LibMatRaisedButtonComponent,
+  LibMatStrokedButtonComponent, LibMatButtonComponent
+} from '@saad-ihhn/ihhn-host-lib/lib-buttons';
+import { IDialogData } from './lib-dialog';
+import { DynamicResolverPipe } from '@saad-ihhn/ihhn-host-lib/pipes';
+import { resolveDynamic } from '@saad-ihhn/ihhn-host-lib/utilis';
+
+/**
+ * A reusable Angular Material dialog component with support for:
+ * - Custom headers with titles, icons, and action buttons.
+ * - Dynamic component injection with typed data.
+ * - Configurable action buttons with tooltips, loaders, and badges.
+ * - Memory-safe cleanup using signals and DestroyRef.
+ * @template D - The type of data passed to the dynamic component.
+ */
+@Component({
+  selector: 'lib-dialog',
+  standalone: true,
+  imports: [
+    CommonModule,
+    MatIconModule,
+    LibMatIconButtonComponent,
+    LibMatFlatButtonComponent,
+    LibMatRaisedButtonComponent,
+    LibMatStrokedButtonComponent,
+    LibMatButtonComponent,
+    DynamicResolverPipe
+  ],
+  template: `
+    <div class="lib-dialog-container">
+      <!-- Header Section -->
+      <div class="lib-dialog-header-container" [ngStyle]="{ 'background-color': $componentData.title ? 'var(--mat-sys-surface)' : 'transparent' }">
+        <div [ngClass]="($componentData.headerContainerClass | dynamicResolverPipe:'':'') + ' lib-dialog-header'">
+          <!-- Left Content with Title and Icon -->
+          <div class="lib-dialog-header-left-content">
+            @if ($componentData.headerIcon) {
+              <mat-icon [ngClass]="$componentData.headerIconClass | dynamicResolverPipe:'':''" class="material-icons-outlined">
+                {{ $componentData.headerIcon | dynamicResolverPipe:'':'' }}
+              </mat-icon>
+            }
+            @if ($componentData.title) {
+              <h5 [class]="($componentData.titleClass | dynamicResolverPipe:'':'') + ' lib-dialog-title'">
+                {{ $componentData.title | dynamicResolverPipe:'':'' }}
+              </h5>
+            }
+          </div>
+
+          <!-- Middle Content (Optional) -->
+          @if ($componentData.headerMiddleContent) {
+            <div
+              [ngClass]="($componentData.headerMiddleContentClass | dynamicResolverPipe:'':'') + ' lib-dialog-header-middle-content'"
+            >
+              <ng-container [ngTemplateOutlet]="$componentData.headerMiddleContent | dynamicResolverPipe"></ng-container>
+            </div>
+          }
+
+          <!-- Right Content with Action Buttons -->
+          <div class="lib-dialog-header-right-content">
+            @for (actionButton of $componentData.headerButtons ?? []; track actionButton) {
+              @let resolved = {
+                className: actionButton.className | dynamicResolverPipe:'':'',
+                color: actionButton.color | dynamicResolverPipe:'':'primary',
+                disabled: actionButton.disabled | dynamicResolverPipe:'':false,
+                source: actionButton.source | dynamicResolverPipe:'':'',
+                sourceType: actionButton.sourceType | dynamicResolverPipe:'':'icon',
+                tooltip: actionButton.tooltip | dynamicResolverPipe:'':'',
+                tooltipPosition: actionButton.tooltipPosition | dynamicResolverPipe:'':'below',
+                tooltipShowDelay: actionButton.tooltipShowDelay | dynamicResolverPipe:'':0,
+                tooltipHideDelay: actionButton.tooltipHideDelay | dynamicResolverPipe:'':0,
+                tooltipDisabled: actionButton.tooltipDisabled | dynamicResolverPipe:'':false
+              };
+              <lib-mat-icon-button
+                [className]="resolved.className"
+                [color]="resolved.color"
+                [disabled]="resolved.disabled"
+                [source]="resolved.source"
+                [sourceType]="resolved.sourceType"
+                [tooltip]="resolved.tooltip"
+                [tooltipPosition]="resolved.tooltipPosition"
+                [tooltipShowDelay]="resolved.tooltipShowDelay"
+                [tooltipHideDelay]="resolved.tooltipHideDelay"
+                [tooltipDisabled]="resolved.tooltipDisabled"
+                (matClick)="actionButton.onClick?.()"
+                (matDblClick)="actionButton.onDblClick?.()"
+              ></lib-mat-icon-button>
+            }
+            @if ($componentData.showCloseIcon) {
+              <lib-mat-icon-button
+                (matClick)="onCancel()"
+                source="close"
+                [className]="$componentData.closeIconClass | dynamicResolverPipe:'':''"
+              ></lib-mat-icon-button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Message Content -->
+      @if ($componentData.message) {
+        <div class="lib-dialog-content">
+          <p [ngClass]="$componentData.messageClass | dynamicResolverPipe:'':''">
+            {{ $componentData.message | dynamicResolverPipe:'':'' }}
+          </p>
+        </div>
+      }
+
+      <!-- Dynamic Component Content -->
+      <div [ngClass]="{'lib-dialog-content': $componentData.component}">
+        <ng-template #dialogContent></ng-template>
+      </div>
+
+      <!-- Action Buttons -->
+      @if (($componentData.actionsButtons | dynamicResolverPipe:'':[]).length > 0) {
+        <div [ngClass]="($componentData.buttonsContainerClass | dynamicResolverPipe:'':'') + ' lib-dialog-actions-container'">
+          @for (actionButton of ($componentData.actionsButtons | dynamicResolverPipe:'':[]) ?? []; track actionButton) {
+            <!-- Problem Pipe With Signal So Using Resolver Function | Revert This method after stable signals with pipe -->
+            @let resolved = {
+              className: resolveDynamic(actionButton.className, '', ''),
+              color: resolveDynamic(actionButton.color, '', 'primary'),
+              disabled: resolveDynamic(actionButton.disabled),
+              labelPosition: resolveDynamic(actionButton.labelPosition, '', 'right'),
+              matBadge: resolveDynamic(actionButton.matBadge, '', ''),
+              type: resolveDynamic(actionButton.type, '', 'button'),
+              source: resolveDynamic(actionButton.source, '', ''),
+              sourceType: resolveDynamic(actionButton.sourceType, '', 'icon'),
+              tooltip: resolveDynamic(actionButton.tooltip),
+              tooltipDisabled: resolveDynamic(actionButton.tooltipDisabled, '', false),
+              tooltipHideDelay: resolveDynamic(actionButton.tooltipHideDelay, '', 0),
+              tooltipPosition: resolveDynamic(actionButton.tooltipPosition, '', 'below'),
+              tooltipShowDelay: resolveDynamic(actionButton.tooltipShowDelay, '', 0),
+              loaderColor: resolveDynamic(actionButton.loaderColor, '', 'primary'),
+              loaderDiameter: resolveDynamic(actionButton.loaderDiameter, '', 20),
+              loaderImageSrc: resolveDynamic(actionButton.loaderImageSrc, '', ''),
+              loaderMode: resolveDynamic(actionButton.loaderMode, '', 'indeterminate'),
+              loaderValue: resolveDynamic(actionButton.loaderValue, '', 0),
+              buttonTitle: resolveDynamic(actionButton.buttonTitle, '', '')
+            };
+            @switch (actionButton.variant) {
+              @case ('mat-flat-button') {
+                <lib-mat-flat-button
+                  [className]="resolved.className"
+                  [color]="resolved.color"
+                  [disabled]="resolved.disabled"
+                  [labelPosition]="resolved.labelPosition"
+                  [matBadge]="resolved.matBadge"
+                  [type]="resolved.type"
+                  [source]="resolved.source"
+                  [sourceType]="resolved.sourceType"
+                  [tooltip]="resolved.tooltip"
+                  [tooltipDisabled]="resolved.tooltipDisabled"
+                  [tooltipHideDelay]="resolved.tooltipHideDelay"
+                  [tooltipPosition]="resolved.tooltipPosition"
+                  [tooltipShowDelay]="resolved.tooltipShowDelay"
+                  [loaderColor]="resolved.loaderColor"
+                  [loaderDiameter]="resolved.loaderDiameter"
+                  [loaderImageSrc]="resolved.loaderImageSrc"
+                  [loaderMode]="resolved.loaderMode"
+                  [loaderValue]="resolved.loaderValue"
+                  (matClick)="actionButton.onClick?.()"
+                  (matDblClick)="actionButton.onDblClick?.()"
+                >
+                  {{ resolved.buttonTitle }}
+                </lib-mat-flat-button>
+              }
+              @case ('mat-raised-button') {
+                <lib-mat-raised-button
+                  [className]="resolved.className"
+                  [color]="resolved.color"
+                  [disabled]="resolved.disabled"
+                  [labelPosition]="resolved.labelPosition"
+                  [matBadge]="resolved.matBadge"
+                  [type]="resolved.type"
+                  [source]="resolved.source"
+                  [sourceType]="resolved.sourceType"
+                  [tooltip]="resolved.tooltip"
+                  [tooltipDisabled]="resolved.tooltipDisabled"
+                  [tooltipHideDelay]="resolved.tooltipHideDelay"
+                  [tooltipPosition]="resolved.tooltipPosition"
+                  [tooltipShowDelay]="resolved.tooltipShowDelay"
+                  [loaderColor]="resolved.loaderColor"
+                  [loaderDiameter]="resolved.loaderDiameter"
+                  [loaderImageSrc]="resolved.loaderImageSrc"
+                  [loaderMode]="resolved.loaderMode"
+                  [loaderValue]="resolved.loaderValue"
+                  (matClick)="actionButton.onClick?.()"
+                  (matDblClick)="actionButton.onDblClick?.()"
+                >
+                  {{ resolved.buttonTitle }}
+                </lib-mat-raised-button>
+              }
+              @case ('mat-stroked-button') {
+                <lib-mat-stroked-button
+                  [className]="resolved.className"
+                  [color]="resolved.color"
+                  [disabled]="resolved.disabled"
+                  [labelPosition]="resolved.labelPosition"
+                  [matBadge]="resolved.matBadge"
+                  [type]="resolved.type"
+                  [source]="resolved.source"
+                  [sourceType]="resolved.sourceType"
+                  [tooltip]="resolved.tooltip"
+                  [tooltipDisabled]="resolved.tooltipDisabled"
+                  [tooltipHideDelay]="resolved.tooltipHideDelay"
+                  [tooltipPosition]="resolved.tooltipPosition"
+                  [tooltipShowDelay]="resolved.tooltipShowDelay"
+                  [loaderColor]="resolved.loaderColor"
+                  [loaderDiameter]="resolved.loaderDiameter"
+                  [loaderImageSrc]="resolved.loaderImageSrc"
+                  [loaderMode]="resolved.loaderMode"
+                  [loaderValue]="resolved.loaderValue"
+                  (matClick)="actionButton.onClick?.()"
+                  (matDblClick)="actionButton.onDblClick?.()"
+                >
+                  {{ resolved.buttonTitle }}
+                </lib-mat-stroked-button>
+              }
+              @case ('mat-button') {
+                <lib-mat-button
+                  [className]="resolved.className"
+                  [color]="resolved.color"
+                  [disabled]="resolved.disabled"
+                  [labelPosition]="resolved.labelPosition"
+                  [matBadge]="resolved.matBadge"
+                  [type]="resolved.type"
+                  [source]="resolved.source"
+                  [sourceType]="resolved.sourceType"
+                  [tooltip]="resolved.tooltip"
+                  [tooltipDisabled]="resolved.tooltipDisabled"
+                  [tooltipHideDelay]="resolved.tooltipHideDelay"
+                  [tooltipPosition]="resolved.tooltipPosition"
+                  [tooltipShowDelay]="resolved.tooltipShowDelay"
+                  [loaderColor]="resolved.loaderColor"
+                  [loaderDiameter]="resolved.loaderDiameter"
+                  [loaderImageSrc]="resolved.loaderImageSrc"
+                  [loaderMode]="resolved.loaderMode"
+                  [loaderValue]="resolved.loaderValue"
+                  (matClick)="actionButton.onClick?.()"
+                  (matDblClick)="actionButton.onDblClick?.()"
+                >
+                  {{ resolved.buttonTitle }}
+                </lib-mat-button>
+              }
+              @default {
+                <lib-mat-flat-button
+                  [className]="resolved.className"
+                  [color]="resolved.color"
+                  [disabled]="resolved.disabled"
+                  [labelPosition]="resolved.labelPosition"
+                  [matBadge]="resolved.matBadge"
+                  [type]="resolved.type"
+                  [source]="resolved.source"
+                  [sourceType]="resolved.sourceType"
+                  [tooltip]="resolved.tooltip"
+                  [tooltipDisabled]="resolved.tooltipDisabled"
+                  [tooltipHideDelay]="resolved.tooltipHideDelay"
+                  [tooltipPosition]="resolved.tooltipPosition"
+                  [tooltipShowDelay]="resolved.tooltipShowDelay"
+                  [loaderColor]="resolved.loaderColor"
+                  [loaderDiameter]="resolved.loaderDiameter"
+                  [loaderImageSrc]="resolved.loaderImageSrc"
+                  [loaderMode]="resolved.loaderMode"
+                  [loaderValue]="resolved.loaderValue"
+                  (matClick)="actionButton.onClick?.()"
+                  (matDblClick)="actionButton.onDblClick?.()"
+                >
+                  {{ resolved.buttonTitle }}
+                </lib-mat-flat-button>
+              }
+            }
+          }
+        </div>
+      }
+    </div>
+  `,
+  styles: [
+    `
+      .mat-text-dark-300 {
+        color: var(--mat-sys-on-surface);
+      }
+      .lib-dialog-container {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        min-width: 300px;
+        max-width: 95dvw;
+        min-height: 170px;
+        max-height: 90dvh;
+        overflow: auto;
+        border-radius: 0.375rem;
+      }
+      .lib-dialog-header-container {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        padding: .75rem .7rem;
+      }
+      .lib-dialog-header {
+        display: flex;
+        position: sticky;
+        top: 0;
+        justify-content: space-between;
+        align-items: center;
+        padding: .5rem .75rem;
+        height: 2.688rem;
+        border-radius: .375rem;
+        background-color: var(--mat-sys-surface-container);
+      }
+      .lib-dialog-header-left-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lib-dialog-title {
+        font-weight: 600;
+      }
+      .lib-dialog-header-right-content {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lib-dialog-content {
+        flex: 1 1 auto;
+        padding: 0 1rem;
+      }
+      .lib-dialog-actions-container {
+        position: sticky;
+        bottom: 0;
+        background-color: var(--mat-sys-surface);
+        z-index: 2;
+        display: flex;
+        gap: .5rem;
+        align-items: center;
+        justify-content: flex-end;
+        padding: .4rem .75rem .7rem;
+        border-top: 1px solid var(--mat-sys-surface-bright);
+      }
+    `,
+  ],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibDialogComponent implements AfterViewInit {
+  /**
+   * Reference to the dynamic content container within the dialog.
+   */
+  private $dialogContent = viewChild('dialogContent', { read: ViewContainerRef });
+
+  /**
+   * Reference to the dynamic template component datay
+   * .
+   */
+  protected $componentData = inject<IDialogData>(MAT_DIALOG_DATA);
+
+  /**
+   * Reference to the dynamically created component.
+   */
+  private componentRef = signal<ComponentRef<any> | null>(null);
+
+  /**
+   * Injected Angular Material dialog reference to control dialog actions.
+   */
+  private $dialogRef = inject(MatDialogRef<LibDialogComponent>);
+
+  protected resolveDynamic = resolveDynamic;
+
+  /**
+   * Lifecycle hook that runs after the view has been initialized.
+   * Loads the dynamic component, if any.
+   */
+  ngAfterViewInit(): void {
+    this.loadComponent();
+  }
+
+  /**
+   * Dynamically loads a component inside the dialog.
+   */
+  private loadComponent(): void {
+    if (this.$componentData.component) {
+      const containerRef = this.$dialogContent()!;
+      containerRef.clear();
+      if (this.$componentData.component) {
+        this.componentRef.set(containerRef.createComponent(resolveDynamic(this.$componentData.component)));
+        if (this.$componentData.componentData) {
+          Object.assign(this.componentRef()?.instance, this.$componentData.componentData);
+        }
+      }
+    }
+  }
+
+  /**
+   * Closes the dialog and returns `false` as the result.
+   */
+  onCancel(): void {
+    this.$dialogRef.close(false);
+  }
+
+  /**
+   * Closes the dialog and returns `true` as the result.
+   */
+  onConfirm(): void {
+    this.$dialogRef.close(true);
+  }
+}

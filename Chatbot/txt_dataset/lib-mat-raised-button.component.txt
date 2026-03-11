@@ -1,0 +1,222 @@
+import { Component, output, input, ChangeDetectionStrategy } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatBadgeModule } from '@angular/material/badge';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatDividerModule } from '@angular/material/divider';
+import { NgClass, NgOptimizedImage } from '@angular/common';
+
+/**
+ * A reusable Material Design raised button component with elevation effect.
+ * Features include:
+ * - Elevation effect (raised appearance)
+ * - Flexible content (text, icons, or images)
+ * - Badge notifications
+ * - Tooltip support
+ * - Full theming support
+ * - Accessibility compliant
+ * - Ripple effect
+ */
+@Component({
+  selector: 'lib-mat-raised-button',
+  standalone: true,
+  imports: [
+    MatButtonModule,
+    MatBadgeModule,
+    MatIconModule,
+    MatTooltipModule,
+    MatDividerModule,
+    NgOptimizedImage,
+    NgClass
+  ],
+  template: `
+    <button
+      mat-raised-button
+      [color]="color()"
+      [disabled]="disabled()"
+      [type]="type()"
+      [class]="(className() || '') + ' lib-mat-raised-button' + (labelPosition() ? ' raised-label-align-' + labelPosition() : '')"
+      [ngClass]="ngClassNames()"
+      (click)="onClick()"
+      (dblclick)="onDblClick()"
+      [matBadge]="matBadge()"
+      [matTooltip]="tooltip() || ''"
+      [matTooltipPosition]="tooltipPosition()"
+      [matTooltipShowDelay]="tooltipShowDelay()"
+      [matTooltipHideDelay]="tooltipHideDelay()"
+      [matTooltipDisabled]="tooltipDisabled() || !tooltip()"
+    >
+      @if (sourceType() == 'icon' && source()) {
+        <mat-icon>{{ source() }}</mat-icon>
+      }
+      @else if (sourceType() == 'image' && source()) {
+        <mat-icon><img [ngSrc]="source() ?? ''" width="20" height="20" alt="Loading..." /></mat-icon>
+      }
+      <ng-content></ng-content>
+    </button>
+  `,
+  styles: [`
+    :host .lib-mat-raised-button {
+      display: flex;
+      align-items: center;
+    }
+    :host .lib-mat-raised-button.raised-label-align-left,
+    :host ::ng-deep .lib-mat-raised-button.raised-label-align-left .mdc-button__label {
+      flex-direction: row-reverse;
+    }
+    :host ::ng-deep .lib-mat-raised-button .mdc-button__label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 13px;
+    }
+    :host ::ng-deep .lib-mat-raised-button img {
+      display: inline-block;
+    }
+    :host ::ng-deep .lib-mat-raised-button .mat-mdc-button-touch-target {
+      z-index: 1;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibMatRaisedButtonComponent {
+  /**
+   * Theme color of the button.
+   * Accepts 'primary', 'accent', 'warn', or a custom color string.
+   * @default 'primary'
+   */
+  readonly color = input<'primary' | 'accent' | 'warn' | string>('primary');
+
+  /**
+   * Whether the button is disabled.
+   * @default false
+   */
+  readonly disabled = input<boolean>(false);
+
+  /**
+   * Source type for the button graphic.
+   * Accepts 'icon' (Material icon) or 'image' (image URL).
+   * @default 'icon'
+   */
+  readonly sourceType = input<'icon' | 'image'>('icon');
+
+  /**
+   * Button type: 'button', 'submit', or 'reset'.
+   * @default 'button'
+   */
+  readonly type = input<'button' | 'submit' | 'reset'>('button');
+
+  /**
+   * Additional CSS class names to apply to the button.
+   * @default null
+   */
+  readonly className = input<string | null>(null);
+
+  readonly ngClassNames = input<string | string[] | Set<string> | {[klass: string]: any} | null | undefined>(undefined);
+
+  /**
+   * Optional badge value to display on the button.
+   * @default null
+   */
+  readonly matBadge = input<string | null>(null);
+
+  /**
+   * Name of the Material icon or image URL to display.
+   * @default null
+   */
+  readonly source = input<string | null>(null);
+
+  /**
+   * Position of the label relative to the icon/image.
+   * Accepts 'left' or 'right'.
+   * @default 'right'
+   */
+  readonly labelPosition = input<'left' | 'right'>('right');
+
+  /**
+   * Tooltip text to display on hover.
+   * @default null
+   */
+  readonly tooltip = input<string | null>(null);
+
+  /**
+   * Position of the tooltip relative to the button.
+   * Accepts 'above', 'below', 'left', 'right'.
+   * @default 'below'
+   */
+  readonly tooltipPosition = input<'above' | 'below' | 'left' | 'right'>('below');
+
+  /**
+   * Delay in milliseconds before showing the tooltip.
+   * @default 0
+   */
+  readonly tooltipShowDelay = input<number>(0);
+
+  /**
+   * Delay in milliseconds before hiding the tooltip.
+   * @default 0
+   */
+  readonly tooltipHideDelay = input<number>(0);
+
+  /**
+   * Whether to disable the tooltip.
+   * @default false
+   */
+  readonly tooltipDisabled = input<boolean>(false);
+
+  /**
+   * Optional image source for the loader instead of the spinner.
+   * @default undefined
+   */
+  readonly loaderImageSrc = input<string | undefined>(undefined);
+
+  /**
+   * The color of the progress spinner.
+   * Accepts 'primary', 'accent', or 'warn'.
+   * @default 'primary'
+   */
+  readonly loaderColor = input<'primary' | 'accent' | 'warn'>('primary');
+
+  /**
+   * The diameter (size) of the loader spinner in pixels.
+   * @default 20
+   */
+  readonly loaderDiameter = input<number>(20);
+
+  /**
+   * Spinner mode: 'determinate' or 'indeterminate'.
+   * @default 'indeterminate'
+   */
+  readonly loaderMode = input<'determinate' | 'indeterminate'>('indeterminate');
+
+  /**
+   * Spinner value (0–100) for determinate mode.
+   * Ignored in indeterminate mode.
+   * @default 0
+   */
+  readonly loaderValue = input<number>(0);
+
+  /**
+   * Event emitted when the button is clicked.
+   */
+  matClick = output<void>();
+
+  /**
+   * Event emitted when the button is double clicked.
+   */
+  matDblClick = output<void>();
+
+  /**
+   * Handles button click and emits the matClick event.
+   */
+  onClick(): void {
+    this.matClick.emit();
+  }
+
+  /**
+   * Handles button double click and emits the matDblClick event.
+   */
+  onDblClick(): void {
+    this.matDblClick.emit();
+  }
+}

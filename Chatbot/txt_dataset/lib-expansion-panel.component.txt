@@ -1,0 +1,186 @@
+import { Component, input, output, ChangeDetectionStrategy, effect, signal } from '@angular/core';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { MatIconModule } from '@angular/material/icon';
+import { CommonModule } from '@angular/common';
+
+/**
+ * A customizable expansion panel component built with Angular Material.
+ * 
+ * @remarks
+ * Provides a collapsible content area with configurable header, content projection,
+ * and state management. Supports both single and multiple panel configurations.
+ *
+ * @example
+ * ```html
+ * <lib-expansion-panel
+ *   [title]="'Advanced Settings'"
+ *   [description]="'Configure additional options'"
+ *   [expanded]="true"
+ *   (opened)="onPanelOpen()"
+ * >
+ *   <p>Your custom content here</p>
+ *   <div actions>
+ *     <button mat-button (click)="save()">Save</button>
+ *   </div>
+ * </lib-expansion-panel>
+ * ```
+ */
+@Component({
+  selector: 'lib-expansion-panel',
+  standalone: true,
+  imports: [MatExpansionModule, MatIconModule, CommonModule],
+  template: `
+    <mat-accordion class="lib-expansion-container">
+      <mat-expansion-panel
+        [expanded]="isExpanded()"
+        [hideToggle]="hideToggle()"
+        [disabled]="disabled()"
+        (opened)="onOpened()"
+        (closed)="onClosed()"
+        class="lib-expansion-panel"
+      >
+        <mat-expansion-panel-header class="lib-expansion-header">
+          <mat-panel-title class="lib-expansion-title">
+            @if (icon()) {
+              <mat-icon class="lib-expansion-icon">{{ icon() }}</mat-icon>
+            }
+            {{ title() }}
+          </mat-panel-title>
+          <mat-panel-description class="lib-expansion-description">
+            {{ description() }}
+            @if (showState()) {
+              <span class="lib-expansion-state">
+                ({{ isExpanded() ? 'expanded' : 'collapsed' }})
+              </span>
+            }
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+
+        <div class="lib-expansion-content">
+          <ng-content></ng-content>
+        </div>
+
+        @if (showActions()) {
+          <div class="lib-expansion-actions">
+            <ng-content select="[actions]"></ng-content>
+          </div>
+        }
+      </mat-expansion-panel>
+    </mat-accordion>
+  `,
+  styles: [``],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibExpansionPanelComponent {
+  // #region Inputs
+  /**
+   * The primary title text displayed in the panel header
+   * @defaultValue `'Panel Title'`
+   */
+  title = input<string>('Panel Title');
+
+  /**
+   * Additional descriptive text displayed in the panel header
+   * @defaultValue `''`
+   */
+  description = input<string>('');
+
+  /**
+   * Material icon name to display before the title
+   * @defaultValue `''`
+   */
+  icon = input<string>('');
+
+  /**
+   * Whether the panel should be initially expanded
+   * @defaultValue `false`
+   */
+  expanded = input<boolean>(false);
+
+  /**
+   * Whether to hide the expansion toggle arrow
+   * @defaultValue `false`
+   */
+  hideToggle = input<boolean>(false);
+
+  /**
+   * Whether the panel is disabled
+   * @remarks
+   * When disabled, the panel cannot be toggled and appears grayed out
+   * @defaultValue `false`
+   */
+  disabled = input<boolean>(false);
+
+  /**
+   * Whether to display the current state (expanded/collapsed) in the description
+   * @defaultValue `false`
+   */
+  showState = input<boolean>(false);
+
+  /**
+   * Whether to show the actions section at the bottom of the panel
+   * @remarks
+   * Requires content projected with the `[actions]` selector
+   * @defaultValue `false`
+   */
+  showActions = input<boolean>(false);
+  // #endregion
+
+  // #region Outputs
+  /** 
+   * Emits when the panel is opened
+   * @eventType void
+   */
+  opened = output<void>();
+
+  /** 
+   * Emits when the panel is closed
+   * @eventType void
+   */
+  closed = output<void>();
+
+  /** 
+   * Emits the current expansion state when toggled
+   * @eventType boolean - `true` when expanded, `false` when collapsed
+   */
+  toggle = output<boolean>();
+  // #endregion
+
+  // Internal state signal
+   isExpanded = signal<boolean>(false);
+
+  constructor() {
+    // Sync initial expanded state from input
+    effect(() => {
+      this.isExpanded.set(this.expanded());
+    });
+
+    // Handle disabled state behavior
+    effect(() => {
+      const isDisabled = this.disabled();
+      if (isDisabled && !this.hideToggle()) {
+        console.warn('Disabled panels should typically hide their toggle arrow. Set hideToggle=true when disabled=true');
+      }
+    });
+  }
+
+  /**
+   * Handles panel opened event
+   * @internal
+   */
+  protected onOpened() {
+    this.isExpanded.set(true);
+    this.opened.emit();
+    this.toggle.emit(true);
+  }
+
+  /**
+   * Handles panel closed event
+   * @internal
+   */
+  protected onClosed() {
+    this.isExpanded.set(false);
+    this.closed.emit();
+    this.toggle.emit(false);
+  }
+}

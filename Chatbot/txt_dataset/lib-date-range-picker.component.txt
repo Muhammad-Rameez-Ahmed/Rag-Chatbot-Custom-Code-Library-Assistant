@@ -1,0 +1,326 @@
+import { Component, input, output, ChangeDetectionStrategy, effect} from '@angular/core';
+import { FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatFormFieldModule, MatFormFieldAppearance } from '@angular/material/form-field';
+import { MatDatepickerModule } from '@angular/material/datepicker';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule }from '@angular/material/icon';
+import { provideNativeDateAdapter } from '@angular/material/core';
+import { DatePipe, CommonModule } from '@angular/common';
+import { LibTooltipComponent } from '@saad-ihhn/ihhn-host-lib/lib-tooltip';
+import { ErrorMessagePipe } from '../pipes/lib-error-messages.pipe';
+
+/**
+ * A highly customizable date range picker component built with Angular Material.
+ *
+ * @remarks
+ * This component provides a reusable, accessible date range input field with
+ * start and end date controls, comprehensive form validation, and event handling.
+ *
+ * @example
+ * ```html
+ * <lib-date-range-picker
+ *   label="Date Range"
+ *   [range]="dateRangeForm"
+ *   [appearance]="'fill'"
+ *   [min]="minDate"
+ *   [max]="maxDate"
+ *   (opened)="onPickerOpened()"
+ * ></lib-date-range-picker>
+ * ```
+ */
+@Component({
+  selector: 'lib-date-range-picker',
+  standalone: true,
+  imports: [
+    MatFormFieldModule,
+    MatDatepickerModule,
+    MatInputModule,
+    MatIconModule,
+    ReactiveFormsModule,
+    DatePipe,
+    ErrorMessagePipe,
+    LibTooltipComponent,
+    CommonModule
+  ],
+  providers: [provideNativeDateAdapter()],
+  template: `
+    @if (label() && labelPosition() === 'OutSide') {
+      <mat-label class="lib-mat-label-outside">
+        {{ label() }}
+        @if (range().controls['start'].hasValidator(validatorRequired) && showAsterisk()) {
+          <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+        }
+      </mat-label>
+    }
+    <mat-form-field [class]="class() || '' + ' lib-mat-form-field'" [appearance]="appearance()">
+      @if (label() && labelPosition() === 'Inside') {
+        <mat-label class="lib-mat-label-inside">{{ label() }}</mat-label>
+      }
+      <mat-date-range-input
+        class="lib-mat-form-field-input"
+        [formGroup]="range()"
+        [rangePicker]="picker"
+        [attr.aria-required]="range().controls['start'].hasValidator(validatorRequired)"
+        [attr.aria-invalid]="(range().controls['start'].invalid || range().controls['end'].invalid) && (range().controls['start'].touched || range().controls['end'].touched)"
+      >
+        <input
+          [style.padding-left]="showErrorIcon() && errorIconPosition() == 'left' && (range().controls['start'].errors && (range().controls['start'].touched || range().controls['start'].dirty)) ? '20px' : ''"
+          [style.padding-right]="showErrorIcon() && errorIconPosition() == 'right' && (range().controls['start'].errors && (range().controls['start'].touched || range().controls['start'].dirty)) ? '20px' : ''"
+          matStartDate
+          formControlName="start"
+          [readonly]="readonly()"
+          [placeholder]="startPlaceholder()"
+          [attr.min]="min() | date:'yyyy-MM-dd'"
+          (focus)="focus.emit($event);$event.stopPropagation()"
+          (blur)="blur.emit($event);$event.stopPropagation()"
+          (input)="input.emit($event);$event.stopPropagation()"
+          (change)="change.emit($event);$event.stopPropagation()"
+        />
+        <input
+          [style.padding-left]="showErrorIcon() && errorIconPosition() == 'left' && (range().controls['end'].errors && (range().controls['end'].touched || range().controls['end'].dirty)) ? '20px' : ''"
+          [style.padding-right]="showErrorIcon() && errorIconPosition() == 'right' && (range().controls['end'].errors && (range().controls['end'].touched || range().controls['end'].dirty)) ? '20px' : ''"
+          matEndDate
+          formControlName="end"
+          [readonly]="readonly()"
+          [placeholder]="endPlaceholder()"
+          [attr.max]="max() | date:'yyyy-MM-dd'"
+          (focus)="focus.emit($event);$event.stopPropagation()"
+          (blur)="blur.emit($event);$event.stopPropagation()"
+          (input)="input.emit($event);$event.stopPropagation()"
+          (change)="change.emit($event);$event.stopPropagation()"
+        />
+      </mat-date-range-input>
+      <mat-hint>{{ hint() }}</mat-hint>
+      <mat-datepicker-toggle matIconSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-date-range-picker
+        #picker
+        (opened)="opened.emit()"
+        (closed)="closed.emit()"
+      ></mat-date-range-picker>
+      <!-- @if creating issue internally break angular content projection -->
+      <!-- @if (
+        (range().controls['start'].errors || range().controls['end'].errors) &&
+        (range().controls['start'].touched || range().controls['end'].touched ||
+         range().controls['start'].dirty || range().controls['end'].dirty)
+      ) {
+        @if (!showErrorIcon()) {
+          <mat-error class="lib-mat-form-field-error">
+            {{
+              (range().controls['start'].errors || range().controls['end'].errors)
+                | errorMessage: label() : customErrorMessages()
+            }}
+          </mat-error>
+        } @else {
+          <lib-tooltip
+            [message]="
+              (range().controls['start'].errors || range().controls['end'].errors)
+                | errorMessage: label() : customErrorMessages()
+            "
+            class="lib-error-icon material-icons"
+            [ngClass]="{
+              'lib-error-icon-left': errorIconPosition() === 'left',
+              'lib-error-icon-right': errorIconPosition() === 'right'
+            }"
+          >
+            error_outline
+          </lib-tooltip>
+        }
+      } -->
+      <!-- @if creating issue internally break angular content projection -->
+      <mat-error class="lib-mat-form-field-error" *ngIf="(range().controls['start'].errors || range().controls['end'].errors) &&
+        (range().controls['start'].touched || range().controls['end'].touched ||
+         range().controls['start'].dirty || range().controls['end'].dirty) && !showErrorIcon()">
+            {{
+              (range().controls['start'].errors || range().controls['end'].errors)
+                | errorMessage: label() : customErrorMessages()
+            }}
+      </mat-error>
+
+      <lib-tooltip *ngIf="(range().controls['start'].errors || range().controls['end'].errors) &&
+        (range().controls['start'].touched || range().controls['end'].touched ||
+         range().controls['start'].dirty || range().controls['end'].dirty) && showErrorIcon()"
+                  (click)="$event.stopImmediatePropagation()"
+                  [style.cursor]="'context-menu'"
+                  [style.user-select]="'none'"
+                  [message]="(range().controls['start'].errors || range().controls['end'].errors) | errorMessage: label() : customErrorMessages()"
+                  class="lib-error-icon material-icons"
+                  [ngClass]="{
+                    'lib-error-icon-left': errorIconPosition() === 'left',
+                    'lib-error-icon-right': errorIconPosition() === 'right'
+                  }">
+        error_outline
+      </lib-tooltip>
+    </mat-form-field>
+  `,
+  styles: [`
+    .lib-mat-label-outside {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    .lib-mat-label-outside-required {
+      color: var(--mat-sys-error);
+      margin-left: 0.3rem;
+    }
+    .lib-error-icon {
+      color: var(--mat-sys-error);
+      font-size: 20px;
+      cursor: pointer;
+      position: absolute;
+      top: 0;
+    }
+    .lib-error-icon-left {
+      left: 0;
+    }
+    :host ::ng-deep .lib-error-icon-left span,
+    :host ::ng-deep .lib-error-icon-right span {
+      font-size: 0.8rem !important;
+    }
+    .lib-error-icon-right {
+      right: 0;
+    }
+    .lib-error-tooltip {
+      background-color: #d32f2f !important;
+      color: white !important;
+      font-weight: 500;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibDateRangePickerComponent {
+  // #region Inputs
+  /**
+   * The text label for the date range input field.
+   * @defaultValue `'Enter a date range'`
+   */
+  label = input<string>('');
+
+  /**
+   * Placeholder text for the start date input.
+   * @defaultValue `'Start date'`
+   */
+  startPlaceholder = input<string | undefined>('Start date');
+
+  /**
+   * Placeholder text for the end date input.
+   * @defaultValue `'End date'`
+   */
+  endPlaceholder = input<string>('End date');
+
+  /**
+   * Hint text displayed below the date range input field.
+   * @defaultValue `'MM/DD/YYYY – MM/DD/YYYY'`
+   */
+  hint = input<string>('MM/DD/YYYY – MM/DD/YYYY');
+
+  /**
+   * Minimum date allowed for selection (as a Date object).
+   * @defaultValue `undefined` (no minimum)
+   */
+  min = input<Date | undefined>();
+
+  /**
+   * Maximum date allowed for selection (as a Date object).
+   * @defaultValue `undefined` (no maximum)
+   */
+  max = input<Date | undefined>();
+
+  /**
+   * Custom error messages for specific validation errors.
+   * @example
+   * ```typescript
+   * { matStartDateInvalid: 'Invalid start date', matEndDateInvalid: 'Invalid end date' }
+   * ```
+   * @defaultValue `{}`
+   */
+  customErrorMessages = input<Record<string, string>>({});
+
+  /**
+   * Material form field appearance style.
+   * @defaultValue `'outline'`
+   */
+  appearance = input<MatFormFieldAppearance>('outline');
+
+  /**
+   * Position of the label relative to the input field.
+   * - 'Inside': Label appears inside the input border
+   * - 'OutSide': Label appears above the input field
+   * @defaultValue `'OutSide'`
+   */
+  labelPosition = input<'Inside' | 'OutSide'>('OutSide');
+
+  /**
+   * Whether the input is disabled.
+   * @defaultValue `false`
+   */
+  disabled = input<boolean>(false);
+
+  /** 
+   * Whether the input is readonly.
+   * @defaultValue `false`
+   */
+  readonly = input<boolean>(false);
+
+  /**
+   * The FormGroup instance managing the start and end date controls.
+   * @remarks
+   * This is a required input that must be provided by the parent component.
+   */
+  range = input.required<FormGroup>({ alias: 'range' });
+
+  /**
+   * Custom CSS class(es) to apply to the form field.
+   * @defaultValue `''`
+   */
+  class = input<string>('');
+
+  /** Whether to show Asterisk. Default: true */
+  showAsterisk = input<boolean>(true);
+
+  /**
+   * Whether to show error as an icon with tooltip instead of mat-error.
+   * @defaultValue `false`
+   */
+  showErrorIcon = input<boolean>(false);
+
+  /**
+   * Position of the error icon when shown (left or right side of input).
+   * @defaultValue `'left'`
+   */
+  errorIconPosition = input<'left' | 'right'>('right');
+  // #endregion
+
+  // #region Outputs
+  /** Emits when the input loses focus */
+  blur = output<FocusEvent>();
+  /** Emits when the input gains focus */
+  focus = output<FocusEvent>();
+  /** Emits on any input change */
+  input = output<Event>();
+  /** Emits when the input value changes and loses focus */
+  change = output<Event>();
+  /** Emits when the date picker opens */
+  opened = output<void>();
+  /** Emits when the date picker closes */
+  closed = output<void>();
+  // #endregion
+
+  protected validatorRequired = Validators.required;
+
+  constructor() {
+    effect(() => {
+      const range = this.range();
+      const isDisabled = this.disabled();
+      Promise.resolve().then(() => {
+        if (isDisabled && range.enabled) {
+          range.disable({ emitEvent: false });
+        } else if (!isDisabled && range.disabled) {
+          range.enable({ emitEvent: false });
+        }
+      });
+    });
+  }
+}

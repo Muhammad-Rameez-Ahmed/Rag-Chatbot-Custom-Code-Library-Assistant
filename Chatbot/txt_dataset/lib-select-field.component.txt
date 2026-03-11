@@ -1,0 +1,513 @@
+import { CommonModule } from '@angular/common';
+import {Component, input, output, ChangeDetectionStrategy, effect, computed, signal, model, inject, viewChild, AfterViewChecked, ChangeDetectorRef} from '@angular/core';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatFormFieldModule, MatFormFieldAppearance } from '@angular/material/form-field';
+import { MatSelectModule, MatSelectChange, MatOption } from '@angular/material/select';
+import { LibTooltipComponent } from '@saad-ihhn/ihhn-host-lib/lib-tooltip';
+import { ErrorMessagePipe } from '../pipes/lib-error-messages.pipe';
+
+/**
+ * A highly customizable select field component built with Angular Material.
+ *
+ * @remarks
+ * This component provides a reusable, accessible, and feature-rich select field
+ * with single or multiple selection, search functionality, comprehensive form validation,
+ * and event handling.
+ *
+ * @example
+ * ```html
+ * <lib-select-field
+ *   label="Select Option"
+ *   [control]="selectControl"
+ *   [options]="options"
+ *   [multiple]="true"
+ *   [searchable]="true"
+ *   [appearance]="'outline'"
+ *   (selectionChange)="onSelectionChange($event)"
+ * ></lib-select-field>
+ * ```
+ * @template T The type of values in the select options
+ */
+@Component({
+  selector: 'lib-select-field',
+  standalone: true,
+  imports: [
+    MatFormFieldModule,
+    MatSelectModule,
+    ReactiveFormsModule,
+    ErrorMessagePipe,
+    CommonModule,
+    LibTooltipComponent
+  ],
+  template: `
+    @if (label() && labelPosition() === 'OutSide') {
+      <mat-label class="lib-mat-label-outside">
+        {{ label() }}
+        @if (control().hasValidator(validatorRequired) && showAsterisk()) {
+          <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+        }
+      </mat-label>
+    }
+    <mat-form-field
+      [class]="class() || '' + ' lib-mat-form-field'"
+      [appearance]="appearance()"
+    >
+      @if (label() && labelPosition() === 'Inside') {
+        <mat-label class="lib-mat-label-inside">{{ label() }}</mat-label>
+      }
+      <div><ng-content></ng-content></div>
+      <mat-select
+        [style.padding-left]="showErrorIcon() && errorIconPosition() == 'left' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        [style.padding-right]="showErrorIcon() && errorIconPosition() == 'right' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        class="lib-mat-form-field-input"
+        [formControl]="control()"
+        [placeholder]="placeholder()"
+        [multiple]="multiple()"
+        [attr.aria-required]="control().hasValidator(validatorRequired)"
+        [attr.aria-invalid]="control().invalid && control().touched"
+        (opened)="opened.emit()"
+        (closed)="closed.emit();"
+        (selectionChange)="selectionChange.emit($event)"
+      >
+        <mat-select-trigger>
+          {{ getSelectedLabels() }}
+        </mat-select-trigger>
+        <!-- Search Input -->
+        @if (searchable()) {
+          <div class="search-option"
+          (click)="$event.stopPropagation()"
+          (dblclick)="$event.stopPropagation()">
+            <input
+              type="text"
+              [formControl]="searchControl"
+              [readonly]="readonly()"
+              (keyup)="$event.stopPropagation()"
+              (keydown.space)="$event.stopPropagation()"
+              (click)="$event.stopPropagation()"
+              (dblclick)="$event.stopPropagation()"
+              (keydown.escape)="onSearchEscape()"
+              placeholder="Search..."
+              class="search-input"
+            />
+            <span class="material-icons" (click)="searchControl.setValue('')">close</span>
+          </div>
+        }
+
+        <!-- Optional All Option -->
+        @if (showAllOption() && filteredOptions().length > 0) {
+        <mat-option
+          #allOption
+          class="lib-mat-option"
+          (click)="toggleSelectAll()"
+          [value]="multiple() ? null : 'ALL'"
+        >
+          {{ allOptionLabel() }}
+        </mat-option>
+
+        }
+        <!-- Options -->
+        @for (option of filteredOptions(); track trackByFn($index, option)) {
+          <mat-option class="lib-mat-option" [value]="valueSetter(option)">
+            {{ displayFn()?.(option) }}
+          </mat-option>
+        } @empty {
+          <span class="lib-mat-option" disabled>No options found</span>
+        }
+      </mat-select>
+      <!-- @if creating issue internally break angular content projection -->
+      <!-- @if (control().errors && (control().touched || control().dirty)) {
+        @if (!showErrorIcon()) {
+          <mat-error class="lib-mat-form-field-error">
+            {{ control().errors | errorMessage:label():customErrorMessages() }}
+          </mat-error>
+        } @else {
+          <lib-tooltip (click)="$event.stopImmediatePropagation()" [style.cursor]="'context-menu'" [style.user-select]="'none'" [message]="control().errors | errorMessage:label():customErrorMessages()"
+          class="lib-error-icon material-icons"
+          [ngClass]="{
+            'lib-error-icon-left': errorIconPosition() === 'left',
+            'lib-error-icon-right': errorIconPosition() === 'right'
+          }">
+          error_outline
+          </lib-tooltip>
+        }
+      } -->
+      <!-- @if creating issue internally break angular content projection -->
+      <mat-error class="lib-mat-form-field-error"
+                *ngIf="control().errors && (control().touched || control().dirty) && !showErrorIcon()">
+        {{ control().errors | errorMessage:label():customErrorMessages() }}
+      </mat-error>
+
+      <lib-tooltip *ngIf="control().errors && (control().touched || control().dirty) && showErrorIcon()"
+                  (click)="$event.stopImmediatePropagation()"
+                  [style.cursor]="'context-menu'"
+                  [style.user-select]="'none'"
+                  [message]="control().errors | errorMessage:label():customErrorMessages()"
+                  class="lib-error-icon material-icons"
+                  [ngClass]="{
+                    'lib-error-icon-left': errorIconPosition() === 'left',
+                    'lib-error-icon-right': errorIconPosition() === 'right'
+                  }">
+        error_outline
+      </lib-tooltip>
+    </mat-form-field>
+  `,
+  styles: [`
+    .lib-mat-label-outside {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    .lib-mat-label-outside-required {
+      color: var(--mat-sys-error);
+      margin-left: 0.3rem;
+    }
+    .search-option {
+      height: auto;
+      position: sticky;
+      top: 0;
+      background-color: var(--mat-sys-surface);
+      border-bottom: 1px solid var(--mat-option-focus-state-layer-color, color-mix(in srgb, var(--mat-sys-on-surface) calc(var(--mat-sys-focus-state-layer-opacity) * 100%), transparent));
+      z-index: 10;
+      padding-inline: 5px;
+      &>span {
+        position: absolute;
+        right: 0.6rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--mat-sys-error);
+        font-size: 1rem !important;
+        cursor: pointer;
+      }
+    }
+    .search-input {
+      width: 93%;
+      padding: 8px;
+      box-sizing: border-box;
+      background-color: var(--mat-sys-surface);
+      color: var(--mat-sys-on-surface);
+      font-size: 0.6rem;
+      &:focus {
+        outline: none !important;
+      }
+    }
+    .lib-mat-option[disabled] {
+      padding-inline: 12px;
+      color: var(--mat-sys-surface-container-highest);
+      pointer-events: none;
+    }
+    .lib-error-icon {
+      color: var(--mat-sys-error);
+      font-size: 20px;
+      cursor: pointer;
+      position: absolute;
+      top: 0;
+    }
+    .lib-error-icon-left {
+      left: 0;
+    }
+    :host ::ng-deep .lib-error-icon-left span,
+    :host ::ng-deep .lib-error-icon-right span {
+      font-size: 0.8rem !important;
+    }
+    .lib-error-icon-right {
+      right: 0;
+    }
+    .lib-error-tooltip {
+      background-color: #d32f2f !important;
+      color: white !important;
+      font-weight: 500;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class LibSelectFieldComponent<T = unknown> implements AfterViewChecked {
+  protected allOptionRef = viewChild<MatOption>('allOption');
+  private cdr = inject(ChangeDetectorRef);
+  // #region Inputs
+  /**
+   * The text label for the select field.
+   * @defaultValue `'Select'`
+   */
+  label = input<string>('');
+
+  /**
+   * Placeholder text displayed when no option is selected.
+   * @defaultValue `'Select an option'`
+   */
+  placeholder = input<string>('Select an option');
+
+  /**
+   * Available options for the select field.
+   * @defaultValue `[]`
+   */
+  options = input.required<T[]>();
+
+  /**
+   * Whether multiple selection is allowed.
+   * @defaultValue `false`
+   */
+  multiple = input<boolean>(false);
+
+  /**
+   * Whether search functionality is enabled.
+   * @defaultValue `false`
+   */
+  searchable = input<boolean>(false);
+
+  /**
+   * Function to transform selected option into display string
+   * @type {model<((option: any) => string) | undefined>}
+   * @description Converts the selected option to a string representation.
+   * If the option is a string, returns the string itself.
+   * If the option is an object, returns its JSON string representation.
+   * @param {any} option - The option to be displayed
+   * @returns {string} String representation of the option
+   */
+  displayFn = model<((option: any) => string) | undefined>((option) => typeof option === 'string' ? option : JSON.stringify(option));
+
+  /**
+   * Input property for specifying which object property to use as value
+   * @type {input<string>}
+   * @description Defines which property of the option object should be used as the value.
+   * If empty, the entire option object will be used as value.
+   */
+  optionValue = input<string>('');
+
+  /**
+   * Extracts value from option based on optionValue configuration
+   * @template T, K
+   * @description Retrieves the appropriate value from an option object.
+   * If optionValue is specified and the option is an object, returns the specified property value.
+   * Otherwise, returns the entire option object.
+   * @param {T} option - The option object to extract value from
+   * @returns {T[K] | T | undefined} The extracted value, entire option, or undefined
+   */
+  protected valueSetter = <K extends keyof T>(option: T): T[K] | T | undefined => {
+    if (option && typeof option === 'object' && this.optionValue()) {
+      return option[this.optionValue() as K];
+    } else {
+      return option;
+    }
+  };
+
+  currentSearchValue = signal<string | null>('');
+
+  /**
+   * Custom error messages for specific validation errors.
+   * @example
+   * ```typescript
+   * { required: 'Selection is mandatory', notFound: 'No options match your search' }
+   * ```
+   * @defaultValue `{}`
+   */
+  customErrorMessages = input<Record<string, string>>({});
+
+  /**
+   * Material form field appearance style.
+   * @defaultValue `'outline'`
+   */
+  appearance = input<MatFormFieldAppearance>('outline');
+
+  /**
+   * Position of the label relative to the select field.
+   * - 'Inside': Label appears inside the input border
+   * - 'OutSide': Label appears above the select field
+   * @defaultValue `'OutSide'`
+   */
+  labelPosition = input<'Inside' | 'OutSide'>('OutSide');
+
+  /**
+   * Whether the select field is disabled.
+   * @defaultValue `false`
+   */
+  disabled = input<boolean>(false);
+
+  /** 
+   * Whether the input is readonly.
+   * @defaultValue `false`
+   */
+  readonly = input<boolean>(false);
+
+  /**
+   * The FormControl instance managing the select value and validation.
+   * @remarks
+   * This is a required input that must be provided by the parent component.
+   */
+  control = input.required<FormControl>({ alias: 'control' });
+
+  /**
+   * Custom CSS class(es) to apply to the form field.
+   * @defaultValue `''`
+   */
+  class = input<string>('');
+
+  /** Whether to show Asterisk. Default: true */
+  showAsterisk = input<boolean>(true);
+
+  /**
+   * Whether to show error as an icon with tooltip instead of mat-error.
+   * @defaultValue `false`
+   */
+  showErrorIcon = input<boolean>(false);
+
+  /**
+   * Position of the error icon when shown (left or right side of input).
+   * @defaultValue `'left'`
+   */
+  errorIconPosition = input<'left' | 'right'>('right');
+
+  showAllOption = input<boolean>(false);
+
+  allOptionLabel = input<string>('All');
+  // #endregion
+
+  // #region Outputs
+  /** Emits when the dropdown opens */
+  opened = output<void>();
+  /** Emits when the dropdown closes */
+  closed = output<void>();
+  /** Emits when the selection changes */
+  selectionChange = output<MatSelectChange>();
+  // #endregion
+
+  // #region Internal State
+  /** FormControl for search input */
+  searchControl = new FormControl<string>('');
+
+  /** Computed filtered options */
+  protected filteredOptions = computed(() => {
+    const options = this.options();
+    const searchTerm = this.currentSearchValue() ?? '';
+    if (!searchTerm) return options;
+    return options.filter(opt => {
+      try {
+        if (this.displayFn()?.(opt) === undefined) return false; 
+        const displayValue = this.displayFn()?.(opt)?.trim().toLowerCase();
+        return displayValue?.includes(searchTerm.trim().toLowerCase());
+      } catch {
+        return false;
+      }
+    });
+  });
+
+  /** TrackBy function for options */
+  protected trackByFn = (index: number, item: T) => {
+    return typeof item === 'object' ? JSON.stringify(item) : String(item);
+  };
+  // #endregion
+
+  protected validatorRequired = Validators.required;
+
+  constructor() {
+    // Sync disabled state with FormControl
+    effect(() => {
+      const control = this.control();
+      const isDisabled = this.disabled();
+      Promise.resolve().then(() => {
+        if (isDisabled && control.enabled) {
+          control.disable({ emitEvent: false });
+        } else if (!isDisabled && control.disabled) {
+          control.enable({ emitEvent: false });
+        }
+      });
+    });
+
+    // Clear search when dropdown closes
+    effect((onCleanup) => {
+      const sub = this.closed.subscribe(() => {
+        this.searchControl.reset('', { emitEvent: false });
+        this.currentSearchValue.set('');
+      });
+      onCleanup(() => sub.unsubscribe());
+    });
+
+    this.searchControl.valueChanges.subscribe((value) => {
+      this.currentSearchValue.set(value);
+    });
+  }
+
+  // #region Search Handlers
+  /** Handle escape key in search */
+  protected onSearchEscape() {
+    this.searchControl.reset('');
+  }
+
+  /**
+   * Toggles selection of all available options when "All" option is clicked.
+   * Works only when multiple selection is enabled.
+   */
+  protected toggleSelectAll(): void {
+    const control = this.control();
+    const options = this.options().map(opt => this.valueSetter(opt));
+    if (this.multiple()) {
+      const currentValue = Array.isArray(control.value) ? control.value : [];
+      const validValues = currentValue.filter(v => v !== undefined && v !== null);
+      const allSelected =
+        validValues.length === options.length &&
+        options.every(o => validValues.includes(o));
+      const newValue = allSelected ? [] : [...options];
+      control.setValue(newValue, { emitEvent: true });
+    } else {
+      control.setValue('ALL', { emitEvent: true });
+    }
+    control.markAsTouched();
+    this.selectionChange.emit({
+      source: null as any,
+      value: control.value,
+    } as MatSelectChange);
+  }
+  // #endregion
+
+  protected isAllSelected(): boolean {
+    const controlValue = this.control().value ?? [];
+    if (!Array.isArray(controlValue)) return false;
+    const options = this.options().map(opt => this.valueSetter(opt));
+    const validValues = controlValue.filter(v => v !== undefined && v !== null);
+    return (
+      validValues.length === options.length &&
+      options.every(o => validValues.includes(o))
+    );
+  }
+
+  ngAfterViewChecked(): void {
+    const allOption = this.allOptionRef();
+    if (!this.multiple()) return;
+    if (!allOption || !this.showAllOption()) return;
+    const shouldBeSelected = this.isAllSelected();
+    if (shouldBeSelected !== allOption?.selected) {
+      if (shouldBeSelected) {
+        allOption?.select();
+      } else {
+        allOption?.deselect();
+      }
+      this.cdr.detectChanges();
+    }
+  }
+
+  protected getSelectedLabels(): string {
+    const controlValue = this.control().value ?? [];
+    if (controlValue === 'ALL') {
+      return this.allOptionLabel();
+    }
+    if (!Array.isArray(controlValue)) {
+      return this.displayFn()?.(controlValue) ?? '';
+    }
+    const labels = controlValue
+      .map(v => {
+        const match = this.options().find(opt => this.valueSetter(opt) === v);
+        return match ? this.displayFn()?.(match) : '';
+      })
+      .filter(l => !!l);
+    if (
+      labels.length === this.options().length &&
+      labels.length > 0
+    ) {
+      return this.allOptionLabel();
+    }
+    return labels.join(', ');
+  }
+
+};

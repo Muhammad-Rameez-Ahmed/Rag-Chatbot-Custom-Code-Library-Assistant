@@ -1,0 +1,416 @@
+import {Component,OnInit,OnChanges,SimpleChanges,DestroyRef,inject, input, output,effect, signal, model, computed,} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import {  MatFormFieldModule, MatFormFieldAppearance} from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { LibTooltipComponent } from '@saad-ihhn/ihhn-host-lib/lib-tooltip';
+import { ErrorMessagePipe } from '../pipes/lib-error-messages.pipe';
+@Component({
+  selector: 'lib-autocomplete',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
+    ErrorMessagePipe,
+    LibTooltipComponent
+  ],
+  template: `
+    @if (label() && labelPosition() === 'OutSide') {
+      <mat-label class="lib-mat-label-outside">
+        {{ label() }}
+        @if (control().hasValidator(validatorRequired) && showAsterisk()) {
+          <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+        }
+      </mat-label>
+    }
+    <mat-form-field
+      [class]="class() || '' + ' lib-mat-form-field'"
+      [appearance]="appearance()"
+    >
+      @if (label() && labelPosition() === 'Inside') {
+        <mat-label class="lib-mat-label-inside">{{ label() }}</mat-label>
+      }
+      <span class="material-icons" matSuffix>search</span>
+      <input
+        #autocompleteInput
+        [style.padding-left]="showErrorIcon() && errorIconPosition() == 'left' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        [style.padding-right]="showErrorIcon() && errorIconPosition() == 'right' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        type="text"
+        matInput
+        [formControl]="control()"
+        [readonly]="readonly()"
+        [matAutocomplete]="auto"
+        [placeholder]="placeholder()"
+        [attr.aria-required]="control().hasValidator(validatorRequired)"
+        [attr.aria-invalid]="control().invalid && control().touched"
+        (blur)="blur.emit($event)"
+        (focus)="focus.emit($event)"
+        (input)="input.emit($event)"
+        (change)="change.emit($event)"
+        (keypress)="keyPress.emit($event)"
+        (keydown)="keyDown.emit($event)"
+        (keyup)="keyUp.emit($event)"
+        (keyup.enter)="enter.emit()"
+        (paste)="paste.emit($event)"
+        (cut)="cut.emit($event)"
+        (copy)="copy.emit($event)"
+        (select)="select.emit($event)"
+        (contextmenu)="contextMenu.emit($event)"
+        (click)="click.emit($event)"
+        (dblclick)="doubleClick.emit($event)"
+        (mousedown)="mouseDown.emit($event)"
+        (mouseup)="mouseUp.emit($event)"
+        (mousemove)="mouseMove.emit($event)"
+        (mouseover)="mouseOver.emit($event)"
+        (mouseout)="mouseOut.emit($event)"
+      />
+      <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn() ?? null" (optionSelected)="optionSelected.emit($event)">
+        @for (option of filteredOptions(); track option) {
+          <mat-option [value]="option">
+            {{ displayFn()?.(option) }}
+          </mat-option>
+        }
+        @if (filteredOptions().length === 0) {
+          <mat-option disabled>No options available</mat-option>
+        }
+      </mat-autocomplete>
+ 
+      <!-- @if creating issue internally break angular content projection -->
+      <!-- @if (control().errors && (control().touched || control().dirty)) {
+        @if (!showErrorIcon()) {
+          <mat-error class="lib-mat-form-field-error">
+            {{ control().errors | errorMessage:label():customErrorMessagesComputed() }}
+          </mat-error>
+        } @else {
+          <lib-tooltip (click)="$event.stopImmediatePropagation()" [style.cursor]="'context-menu'" [style.user-select]="'none'" [message]="control().errors | errorMessage:label():customErrorMessagesComputed()"
+          class="lib-error-icon material-icons"
+          [ngClass]="{
+            'lib-error-icon-left': errorIconPosition() === 'left',
+            'lib-error-icon-right': errorIconPosition() === 'right'
+          }">
+          error_outline
+          </lib-tooltip>
+        }
+      } -->
+      <!-- @if creating issue internally break angular content projection -->
+      <mat-error class="lib-mat-form-field-error"
+                *ngIf="control().errors && (control().touched || control().dirty) && !showErrorIcon()">
+        {{ control().errors | errorMessage:label():customErrorMessagesComputed() }}
+      </mat-error>
+
+      <lib-tooltip *ngIf="control().errors && (control().touched || control().dirty) && showErrorIcon()"
+                  (click)="$event.stopImmediatePropagation()"
+                  [style.cursor]="'context-menu'"
+                  [style.user-select]="'none'"
+                  [message]="control().errors | errorMessage:label():customErrorMessagesComputed()"
+                  class="lib-error-icon material-icons"
+                  [ngClass]="{
+                    'lib-error-icon-left': errorIconPosition() === 'left',
+                    'lib-error-icon-right': errorIconPosition() === 'right'
+                  }">
+        error_outline
+      </lib-tooltip>
+    </mat-form-field>
+  `,
+  styles: [
+    `
+      .lib-mat-label-outside {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.3rem;
+        font-weight: 500;
+      }
+      .lib-mat-label-outside-required {
+        color: var(--mat-sys-error);
+        margin-left: 0.3rem;
+      }
+      .lib-mat-label-inside {
+        display: block;
+        transform-origin: left;
+      }
+      span.material-icons {
+        margin-right: 5px;
+      }
+      .lib-error-icon {
+        color: var(--mat-sys-error);
+        font-size: 20px;
+        cursor: pointer;
+        position: absolute;
+        top: 0;
+      }
+      .lib-error-icon-left {
+        right: 0;
+        span {
+          font-size: 0.8rem !important;
+        }
+      }
+      .lib-error-icon-right {
+        right: -22px;
+        span {
+          font-size: 0.8rem !important;
+        }
+      }
+      .lib-error-tooltip {
+        background-color: #d32f2f !important;
+        color: white !important;
+        font-weight: 500;
+        font-size: 13px;
+        border-radius: 6px;
+      }
+    `,
+  ],
+})
+export class LibAutocompleteComponent implements OnInit, OnChanges {
+  /**
+     * Label to display for the autocomplete field.
+     */
+  label = input<string>('Select');
+
+  /**
+   * Placeholder text shown inside the input field.
+   */
+  placeholder = input<string>('Choose an option');
+
+  /**
+   * Material form field appearance style (e.g. 'outline', 'fill').
+   */
+  appearance = input<MatFormFieldAppearance>('outline');
+
+  /**
+   * Custom error messages map for form validation.
+   */
+  customErrorMessages = input<Record<string, string>>({});
+
+  /** Default / internal error messages */
+  listError = signal<Record<string, string>>({
+    forceSelection: 'Please select a valid option from the list',
+    listIsEmpty: 'List is Empty.'
+  });
+
+  /**
+   * Position of the label: either 'Inside' or 'OutSide'.
+   */
+  labelPosition = input<'Inside' | 'OutSide'>('OutSide');
+
+  /**
+   * CSS class applied to the form field container.
+   */
+  class = input<string>('');
+
+  /** Whether to show Asterisk. Default: true */
+  showAsterisk = input<boolean>(true);
+
+  /**
+   * Whether to show error as an icon with tooltip instead of mat-error.
+   * @defaultValue `false`
+   */
+  showErrorIcon = input<boolean>(false);
+
+  /**
+   * Position of the error icon when shown (left or right side of input).
+   * @defaultValue `'left'`
+   */
+  errorIconPosition = input<'left' | 'right'>('right');
+
+  /**
+   * Whether the input is readonly.
+   */
+  readonly = input<boolean>(false);
+
+  /**
+   * Whether the form control should be disabled.
+   */
+  disabled = input<boolean>(false);
+
+  /**
+   * List of options available for the autocomplete dropdown.
+   */
+  options = input<unknown[]>([]);
+
+  /**
+   * Reactive form control bound to the input field.
+   */
+  control = input.required<FormControl>({ alias: 'control' });
+
+  /** Must be control value from a options list */
+  forceSelection = input<boolean>(true);
+
+  /**
+   * Function to transform selected option into display string
+   * @type {model<((option: any) => string) | undefined>}
+   * @description Converts the selected option to a string representation.
+   * If the option is a string, returns the string itself.
+   * If the option is an object, returns its JSON string representation.
+   * @param {any} option - The option to be displayed
+   * @returns {string} String representation of the option
+   */
+  displayFn = model<((option: any) => string) | undefined>((option) => typeof option === 'string' ? option : JSON.stringify(option));
+  // ================= OUTPUT EVENTS =================
+
+  /** Emits on blur event. */
+  blur = output<FocusEvent>();
+
+  /** Emits on focus event. */
+  focus = output<FocusEvent>();
+
+  /** Emits on input event. */
+  input = output<Event>();
+
+  /** Emits on change event. */
+  change = output<Event>();
+
+  /** Emits on key press event. */
+  keyPress = output<KeyboardEvent>();
+
+  /** Emits on key down event. */
+  keyDown = output<KeyboardEvent>();
+
+  /** Emits on key up event. */
+  keyUp = output<KeyboardEvent>();
+
+  /** Emits when the enter key is pressed. */
+  enter = output<void>();
+
+  /** Emits on paste event. */
+  paste = output<ClipboardEvent>();
+
+  /** Emits on cut event. */
+  cut = output<ClipboardEvent>();
+
+  /** Emits on copy event. */
+  copy = output<ClipboardEvent>();
+
+  /** Emits on select event. */
+  select = output<Event>();
+
+  /** Emits on context menu event. */
+  contextMenu = output<MouseEvent>();
+
+  /** Emits on click event. */
+  click = output<MouseEvent>();
+
+  /** Emits on double-click event. */
+  doubleClick = output<MouseEvent>();
+
+  /** Emits on mouse down event. */
+  mouseDown = output<MouseEvent>();
+
+  /** Emits on mouse up event. */
+  mouseUp = output<MouseEvent>();
+
+  /** Emits on mouse move event. */
+  mouseMove = output<MouseEvent>();
+
+  /** Emits on mouse over event. */
+  mouseOver = output<MouseEvent>();
+
+  /** Emits on mouse out event. */
+  mouseOut = output<MouseEvent>();
+
+  optionSelected = output<unknown>();
+  /**
+   * Used for cleaning up subscriptions when the component is destroyed.
+   */
+  private destroyRef = inject(DestroyRef);
+
+  protected validatorRequired = Validators.required;
+
+  customErrorMessagesComputed = computed(() => {
+    return {
+      ...this.listError(),
+      ...this.customErrorMessages(),
+    };
+  });
+
+  filteredOptions = signal<unknown[]>([]);
+  constructor() {
+    // Effect to enable/disable the form control when `disabled` input changes
+    effect(() => {
+      const isDisabled = this.disabled();
+      Promise.resolve().then(() => {
+        if (isDisabled && this.control().enabled) {
+          this.control().disable({ emitEvent: false });
+        } else if (!isDisabled && this.control().disabled) {
+          this.control().enable({ emitEvent: false });
+        }
+      });
+    });
+
+    effect(() => {
+      const options = this.options();
+      this.filteredOptions.set(options);
+    });
+
+    /** New effect for forceSelection validation */
+    effect(() => {
+      const mustSelect = this.forceSelection();
+      const control = this.control();
+      if (mustSelect) {
+        control.addValidators(this.forceSelectionValidator(() => this.options()));
+      } else {
+        control.removeValidators(this.forceSelectionValidator(() => this.options()));
+      }
+      control.updateValueAndValidity({ emitEvent: false });
+    });
+  }
+
+  private forceSelectionValidator(optionsFn: () => any[]): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value;
+      if (!value || !this.forceSelection()) return null;
+      const options = optionsFn();
+      if (options.length == 0) return { listIsEmpty: true };
+      const isValid = options.some(opt =>
+        typeof opt === 'string'
+          ? opt === value
+          : JSON.stringify(opt) === JSON.stringify(value)
+      );
+      return isValid ? null : { forceSelection: true };
+    };
+  }
+
+
+  /**
+   * Lifecycle hook runs after component initialization.
+   */
+  ngOnInit(): void {
+    // subscribe to value changes
+    this.control()
+      .valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((value) => {
+        this.filteredOptions.set(this._filter(value, this.options()));
+      });
+  }
+
+  /**
+   * Lifecycle hook runs when input properties change.
+   * @param changes - object of changed input values
+   */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['disabled'] && this.control) {
+      if (this.disabled()) {
+        this.control().disable({ emitEvent: false });
+      } else {
+        this.control().enable({ emitEvent: false });
+      }
+    }
+  }
+
+  /**
+   * Filters the given list of options by the provided input value.
+   * @param value - Current input string from the control
+   * @param options - List of available options
+   * @returns Filtered list of options matching the input value
+   */
+  private _filter(value: string, options: unknown[]): any[] {
+    const filterValue = value.toString().toLowerCase().trim();
+    return options.filter((option) =>
+      this.displayFn()?.(option)?.toLowerCase().includes(filterValue)
+    );
+  }
+}

@@ -1,0 +1,101 @@
+import { Component, output, input, ChangeDetectionStrategy } from '@angular/core';
+import { MatTooltipModule } from '@angular/material/tooltip';
+import { NgClass } from '@angular/common';
+
+/**
+ * A reusable button component that supports customizable type, disabled state,
+ * class name, and tooltip. Emits a `matClick` event on click.
+ */
+@Component({
+  selector: 'lib-button',
+  imports: [MatTooltipModule, NgClass],
+  template: `
+    <button
+      [disabled]="disabled()"
+      [type]="type()"
+      [class]="(className() || '') + ' lib-button'"
+      [ngClass]="ngClassNames()"
+      (click)="onClick()"
+      [matTooltip]="tooltip() || ''"
+      [matTooltipPosition]="tooltipPosition()"
+      [matTooltipShowDelay]="tooltipShowDelay()"
+      [matTooltipHideDelay]="tooltipHideDelay()"
+      [matTooltipDisabled]="tooltipDisabled() || !tooltip()"
+    >
+      <ng-content></ng-content>
+    </button>
+  `,
+  styles: ``,
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibButtonComponent {
+  /**
+   * The theme color of the button.
+   * Accepts 'primary', 'accent', 'warn', or a custom color string.
+   * @default ''
+   */
+  readonly color = input<'primary' | 'accent' | 'warn' | string>('');
+
+  /**
+   * Whether the button is disabled.
+   * @default false
+   */
+  readonly disabled = input<boolean>(false);
+
+  /**
+   * The type attribute of the button: "button", "submit", or "reset".
+   * @default 'button'
+   */
+  readonly type = input<'button' | 'submit' | 'reset'>('button');
+
+  /**
+   * Optional CSS class name(s) to apply to the button.
+   * @default null
+   */
+  readonly className = input<string | null>(null);
+
+  readonly ngClassNames = input<string | string[] | Set<string> | {[klass: string]: any} | null | undefined>(undefined);
+
+  /**
+   * The tooltip text to display when hovering over the button.
+   * @default null
+   */
+  readonly tooltip = input<string | null>(null);
+
+  /**
+   * The position of the tooltip relative to the button.
+   * Accepts 'above', 'below', 'left', 'right'.
+   * @default 'below'
+   */
+  readonly tooltipPosition = input<'above' | 'below' | 'left' | 'right'>('below');
+
+  /**
+   * Delay in milliseconds before the tooltip is shown after hovering.
+   * @default 0
+   */
+  readonly tooltipShowDelay = input<number>(0);
+
+  /**
+   * Delay in milliseconds before the tooltip is hidden after leaving.
+   * @default 0
+   */
+  readonly tooltipHideDelay = input<number>(0);
+
+  /**
+   * Whether the tooltip is disabled.
+   * @default false
+   */
+  readonly tooltipDisabled = input<boolean>(false);
+
+  /**
+   * Emits when the button is clicked.
+   */
+  matClick = output<void>();
+
+  /**
+   * Handles click events and emits the `matClick` output.
+   */
+  onClick(): void {
+    this.matClick.emit();
+  }
+}

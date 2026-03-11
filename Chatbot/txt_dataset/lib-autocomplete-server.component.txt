@@ -1,0 +1,800 @@
+import {
+  Component,
+  DestroyRef,
+  inject,
+  input,
+  output,
+  ViewChild,
+  OnInit,
+  signal,
+  OnDestroy,
+  effect,
+  model,
+  computed
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
+import {
+  MatFormFieldModule,
+  MatFormFieldAppearance,
+} from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import {
+  MatAutocompleteModule,
+  MatAutocompleteSelectedEvent,
+  MatAutocompleteTrigger,
+} from '@angular/material/autocomplete';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { HttpParams } from '@angular/common/http';
+import { Observable, Subject, of } from 'rxjs';
+import {
+  map,
+  debounceTime,
+  distinctUntilChanged,
+  catchError
+} from 'rxjs/operators';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { LibLoaderComponent } from '@saad-ihhn/ihhn-host-lib/lib-loader';
+import { LibHttpService } from '@saad-ihhn/ihhn-host-lib/services';
+import { LibInfiniteScrollDirective } from '@saad-ihhn/ihhn-host-lib/directives';
+import { LibTooltipComponent } from '@saad-ihhn/ihhn-host-lib/lib-tooltip';
+import { ErrorMessagePipe } from '../pipes/lib-error-messages.pipe';
+
+@Component({
+  selector: 'lib-autocomplete-server',
+  standalone: true,
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatAutocompleteModule,
+    MatProgressSpinnerModule,
+    ErrorMessagePipe,
+    LibLoaderComponent,
+    LibInfiniteScrollDirective,
+    LibTooltipComponent
+  ],
+  template: `
+    @if (label() && labelPosition() === 'OutSide') {
+    <mat-label class="lib-mat-label-outside">
+      {{ label() }}
+      @if (control().hasValidator(validatorRequired) && showAsterisk()) {
+      <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+      }
+    </mat-label>
+    }
+    <mat-form-field
+      [class]="class() || '' + ' lib-mat-form-field'"
+      [appearance]="appearance()"
+    >
+      @if (label() && labelPosition() === 'Inside') {
+      <mat-label class="lib-mat-label-inside">{{ label() }}</mat-label>
+      }
+      <span class="material-icons" matSuffix>search</span>
+      <input
+        [style.padding-left]="showErrorIcon() && errorIconPosition() == 'left' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        [style.padding-right]="showErrorIcon() && errorIconPosition() == 'right' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        type="text"
+        matInput
+        [formControl]="control()"
+        [readonly]="readonly()"
+        [matAutocomplete]="auto"
+        [placeholder]="placeholder()"
+        [attr.aria-required]="control().hasValidator(validatorRequired)"
+        [attr.aria-invalid]="control().invalid && control().touched"
+        #autocompleteInput
+        (blur)="onBlur($event)"
+        (focus)="onFocus($event)"
+        (input)="input.emit($event)"
+        (change)="change.emit($event)"
+        (keypress)="keyPress.emit($event)"
+        (keydown)="keyDown.emit($event)"
+        (keyup)="keyUp.emit($event)"
+        (keyup.enter)="enter.emit()"
+        (paste)="paste.emit($event)"
+        (cut)="cut.emit($event)"
+        (copy)="copy.emit($event)"
+        (select)="select.emit($event)"
+        (contextmenu)="contextMenu.emit($event)"
+        (click)="click.emit($event)"
+        (dblclick)="doubleClick.emit($event)"
+        (mousedown)="mouseDown.emit($event)"
+        (mouseup)="mouseUp.emit($event)"
+        (mousemove)="mouseMove.emit($event)"
+        (mouseover)="mouseOver.emit($event)"
+        (mouseout)="mouseOut.emit($event)"
+        libInfiniteScroll
+        (scrolledToBottom)="loadMore(false)"
+      />
+      <mat-autocomplete
+        #auto="matAutocomplete"
+        [displayWith]="displayFn()"
+        (optionSelected)="onOptionSelected($event)"
+      >
+        @for (option of options(); track trackByFn($index, option)) {
+        <mat-option [value]="option">
+          {{ displayValue(option) }}
+        </mat-option>
+        }
+
+        <!-- Loading indicator at the bottom -->
+        @if (isLoading()) {
+        <mat-option disabled class="lib-autocomplete-loading">
+          <div class="lib-autocomplete-loading-container">
+            <lib-loader [diameter]="20"></lib-loader>
+            <small>{{ loadingOptionsText() }}</small>
+          </div>
+        </mat-option>
+        }
+
+        <!-- Show no options message when no results -->
+        @if (!isLoading() && options().length === 0 && currentSearchTerm() &&
+        currentSearchTerm().length >= minChars()) {
+        <mat-option disabled>
+          <small>{{ noOptionsText() }}</small>
+        </mat-option>
+        }
+      </mat-autocomplete>
+      <!-- @if creating issue internally break angular content projection -->
+      <!-- @if (control().errors && (control().touched || control().dirty)) {
+        @if (!showErrorIcon()) {
+          <mat-error class="lib-mat-form-field-error">
+            {{ control().errors | errorMessage:label():customErrorMessages() }}
+          </mat-error>
+        } @else {
+          <lib-tooltip (click)="$event.stopImmediatePropagation()" [style.cursor]="'context-menu'" [style.user-select]="'none'" [message]="control().errors | errorMessage:label():customErrorMessages()"
+          class="lib-error-icon material-icons"
+          [ngClass]="{
+            'lib-error-icon-left': errorIconPosition() === 'left',
+            'lib-error-icon-right': errorIconPosition() === 'right'
+          }">
+          error_outline
+          </lib-tooltip>
+        }
+      } -->
+      <!-- @if creating issue internally break angular content projection -->
+      <mat-error class="lib-mat-form-field-error"
+                *ngIf="control().errors && (control().touched || control().dirty) && !showErrorIcon()">
+        {{ control().errors | errorMessage:label():customErrorMessagesComputed() }}
+      </mat-error>
+
+      <lib-tooltip *ngIf="control().errors && (control().touched || control().dirty) && showErrorIcon()"
+                  (click)="$event.stopImmediatePropagation()"
+                  [style.cursor]="'context-menu'"
+                  [style.user-select]="'none'"
+                  [message]="control().errors | errorMessage:label():customErrorMessagesComputed()"
+                  class="lib-error-icon material-icons"
+                  [ngClass]="{
+                    'lib-error-icon-left': errorIconPosition() === 'left',
+                    'lib-error-icon-right': errorIconPosition() === 'right'
+                  }">
+        error_outline
+      </lib-tooltip>
+    </mat-form-field>
+  `,
+  styles: [
+    `
+      .lib-mat-label-outside {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.3rem;
+        font-weight: 500;
+      }
+      .lib-mat-label-outside-required {
+        color: var(--mat-sys-error);
+        margin-left: 0.3rem;
+      }
+      .lib-mat-label-inside {
+        display: block;
+        transform-origin: left;
+      }
+      span.material-icons {
+        margin-right: 5px;
+      }
+      .lib-autocomplete-loading-container {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .lib-autocomplete-loading-container span {
+        font-size: 14px;
+        color: #666;
+      }
+      .lib-error-icon {
+        color: var(--mat-sys-error);
+        font-size: 20px;
+        cursor: pointer;
+        position: absolute;
+        top: 0;
+      }
+      .lib-error-icon-left {
+        right: 0;
+        span {
+          font-size: 0.8rem !important;
+        }
+      }
+      .lib-error-icon-right {
+        right: -22px;
+        span {
+          font-size: 0.8rem !important;
+        }
+      }
+      .lib-error-tooltip {
+        background-color: #d32f2f !important;
+        color: white !important;
+        font-weight: 500;
+        font-size: 13px;
+        border-radius: 6px;
+      }
+    `,
+  ],
+})
+export class LibAutocompleteServerComponent implements OnInit, OnDestroy {
+  // #region Input Properties
+  /** Label text for the autocomplete field */
+  label = input<string>('Select');
+
+  /** Placeholder text for the input field */
+  placeholder = input<string>('Choose an option');
+
+  /** Material form field appearance style */
+  appearance = input<MatFormFieldAppearance>('outline');
+
+  /** Custom error messages for form validation */
+  customErrorMessages = input<Record<string, string>>({});
+
+  /** Position of the label relative to the input field */
+  labelPosition = input<'Inside' | 'OutSide'>('OutSide');
+
+  /** Additional CSS classes for styling */
+  class = input<string>('');
+
+  /** Whether to show Asterisk. Default: true */
+  showAsterisk = input<boolean>(true);
+
+  /** Whether the input is read-only */
+  readonly = input<boolean>(false);
+
+  /** Whether the input is disabled */
+  disabled = input<boolean>(false);
+
+  /** Form control for the autocomplete input */
+  control = input.required<FormControl>({ alias: 'control' });
+
+  /** Function to display the selected option */
+  displayFn = model<(option: any) => string>((option) =>
+    typeof option === 'string' ? option : JSON.stringify(option)
+  );
+
+  /** API endpoint URL for fetching options */
+  apiEndpoint = input.required<string>();
+
+  /** Additional parameters for API requests */
+  apiParams = input<Record<string, any>>({});
+
+  /** Query parameter name for search term */
+  searchQueryParam = input<string>('searchString');
+
+  /** Query parameter name for pagination offset */
+  pageQueryParam = input<string>('CurrentPage');
+
+  /** Query parameter name for pagination limit */
+  limitQueryParam = input<string>('PageSize');
+
+  /** Minimum characters required to trigger search */
+  minChars = input<number>(3);
+
+  /** Number of options to fetch per page */
+  pageIndex = input<number>(1);
+
+  /** Number of options to fetch per page */
+  pageSize = input<number>(20);
+
+  /** Debounce time in milliseconds for search input */
+  debounceTime = input<number>(500);
+
+  /** Text to display when no options are available */
+  noOptionsText = input<string>('No options available');
+
+  /** Text to display while loading options */
+  loadingOptionsText = input<string>('Loading more options...');
+
+  /** JSON path to extract data from API response */
+  responseDataPath = input<string>('value');
+
+  /** JSON path to check if more data is available */
+  responseHasMorePath = input<string>('pagination.totalRecords');
+
+  /** Must be control value from a options list */
+  forceSelection = input<boolean>(false);
+
+  /**
+   * Whether to show error as an icon with tooltip instead of mat-error.
+   * @defaultValue `false`
+   */
+  showErrorIcon = input<boolean>(false);
+
+  /**
+   * Position of the error icon when shown (left or right side of input).
+   * @defaultValue `'left'`
+   */
+  errorIconPosition = input<'left' | 'right'>('right');
+
+  searchTermKey = input<string>('');
+  // #endregion
+
+  // #region Output Events
+  /** Event emitted when the input loses focus */
+  blur = output<FocusEvent>();
+
+  /** Event emitted when the input gains focus */
+  focus = output<FocusEvent>();
+
+  /** Event emitted when the input value changes */
+  input = output<Event>();
+
+  /** Event emitted when the input value is committed */
+  change = output<Event>();
+
+  /** Event emitted when a key is pressed */
+  keyPress = output<KeyboardEvent>();
+
+  /** Event emitted when a key is pressed down */
+  keyDown = output<KeyboardEvent>();
+
+  /** Event emitted when a key is released */
+  keyUp = output<KeyboardEvent>();
+
+  /** Event emitted when the enter key is pressed */
+  enter = output<void>();
+
+  /** Event emitted when text is pasted */
+  paste = output<ClipboardEvent>();
+
+  /** Event emitted when text is cut */
+  cut = output<ClipboardEvent>();
+
+  /** Event emitted when text is copied */
+  copy = output<ClipboardEvent>();
+
+  /** Event emitted when text is selected */
+  select = output<Event>();
+
+  /** Event emitted when context menu is triggered */
+  contextMenu = output<MouseEvent>();
+
+  /** Event emitted when the input is clicked */
+  click = output<MouseEvent>();
+
+  /** Event emitted when the input is double-clicked */
+  doubleClick = output<MouseEvent>();
+
+  /** Event emitted when mouse button is pressed down */
+  mouseDown = output<MouseEvent>();
+
+  /** Event emitted when mouse button is released */
+  mouseUp = output<MouseEvent>();
+
+  /** Event emitted when mouse is moved */
+  mouseMove = output<MouseEvent>();
+
+  /** Event emitted when mouse enters the input */
+  mouseOver = output<MouseEvent>();
+
+  /** Event emitted when mouse leaves the input */
+  mouseOut = output<MouseEvent>();
+
+  /** Event emitted when an option is selected */
+  optionSelected = output<MatAutocompleteSelectedEvent>();
+  // #endregion
+
+  // #region Internal State
+  /** Current list of options */
+  options = signal<any[]>([]);
+
+  /** Whether more data is available to load */
+  hasMore = signal<boolean>(false);
+
+  /** Whether data is currently being loaded */
+  isLoading = signal<boolean>(false);
+
+  /** Current search term */
+  currentSearchTerm = signal<string>('');
+
+  /** Current page number */
+  currentPage = signal<number>(this.pageIndex());
+
+  /** Whether an option was just selected */
+  private optionJustSelected = signal<boolean>(true);
+
+  /** Scroll throttle timer */
+  private scrollThrottleTimer: any = null;
+
+  /** ViewChild reference to the autocomplete trigger */
+  @ViewChild(MatAutocompleteTrigger)
+  autocompleteTrigger!: MatAutocompleteTrigger;
+
+  /** DestroyRef for managing component lifecycle */
+  private destroyRef = inject(DestroyRef);
+
+  /** Subject for unsubscribing from observables on component destruction */
+  private destroy$ = new Subject<void>();
+
+  /** Signal for handling search requests */
+  externalTrigger = model<boolean>(false);
+
+  /** HTTP service for API calls */
+  private $httpClient = inject(LibHttpService);
+
+  /** API error message */
+  apiError = signal<string>('');
+
+  /** Default / internal error messages */
+  listError = signal<Record<string, string>>({
+    forceSelection: 'Please select a valid option from the list',
+    listIsEmpty: 'List is Empty.'
+  });
+  // #endregion
+
+  protected validatorRequired = Validators.required;
+
+  /**
+   * Component constructor
+   * Sets up effect to handle disabled state changes
+   */
+  constructor() {
+    /**
+     * Effect to handle disabled state changes
+     */
+    effect(() => {
+      const isDisabled = this.disabled();
+      const control = this.control();
+      queueMicrotask(() => {
+        if (isDisabled && control.enabled) {
+          control.disable({ emitEvent: false });
+        } else if (!isDisabled && control.disabled) {
+          control.enable({ emitEvent: false });
+        }
+      });
+    });
+
+    /** New effect for forceSelection validation */
+    effect(() => {
+      const mustSelect = this.forceSelection();
+      const control = this.control();
+
+      if (mustSelect) {
+        control.addValidators(this.forceSelectionValidator(() => this.options()));
+      } else {
+        control.removeValidators(this.forceSelectionValidator(() => this.options()));
+      }
+
+      control.updateValueAndValidity({ emitEvent: false });
+    });
+
+    /**
+     * Effect for external trigger
+     */
+    effect(() => {
+      const externalTrigger = this.externalTrigger();
+      if (externalTrigger === true) {
+        this.triggerSearch();
+        queueMicrotask(() => this.externalTrigger.set(false));
+      }
+    });
+  }
+
+  customErrorMessagesComputed = computed(() => {
+    return {
+      ...this.listError(),
+      ...this.customErrorMessages(),
+    };
+  });
+
+  // #region Lifecycle Methods
+  /**
+   * Angular lifecycle hook - ngOnInit
+   * Initializes the component and sets up search functionality
+   */
+  ngOnInit(): void {
+    this.setupSearch();
+  }
+
+  private forceSelectionValidator(optionsFn: () => any[]): ValidatorFn {
+    return (control: AbstractControl): ValidationErrors | null => {
+      const value = control.value;
+      if (!value || !this.forceSelection()) return null;
+      const options = optionsFn();
+      if (typeof value === 'string' && value.length < this.minChars()) return null;
+      if (options.length === 0) return { listIsEmpty: true };
+      const isValid = options.some(opt => {
+        if (typeof value === 'object' && this.searchTermKey()) {
+          return opt[this.searchTermKey()] === value[this.searchTermKey()];
+        }
+        return opt === value;
+      });
+      return isValid ? null : { forceSelection: true };
+    };
+  }
+
+  /**
+   * Angular lifecycle hook - ngOnDestroy
+   * Cleans up resources when component is destroyed
+   */
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    if (this.scrollThrottleTimer) {
+      clearTimeout(this.scrollThrottleTimer);
+    }
+  }
+  // #endregion
+
+  // #region Public Methods
+  public triggerSearch(
+    term?: string,
+    opts: { ignoreMinChars?: boolean; isNewSearch?: boolean } = {}
+  ): void {
+    const searchTerm = term ?? this.getSearchTermFromValue(this.control().value);
+    this.fireSearch({
+      term: searchTerm,
+      ignoreMinChars: opts.ignoreMinChars ?? true,
+      isNewSearch: opts.isNewSearch ?? true,
+    });
+  }
+  // #region Public Methods
+
+  // #region Protected Methods
+  /**
+   * Handles option selection from the autocomplete dropdown
+   * @param event - The autocomplete selection event
+    */
+  protected onOptionSelected(event: MatAutocompleteSelectedEvent): void {
+    this.optionJustSelected.set(false);
+    this.optionSelected.emit(event);
+  }
+
+  /**
+   * Handles blur event on the input field
+   * @param event - The focus event
+   */
+  protected onBlur(event: FocusEvent): void {
+    this.blur.emit(event);
+  }
+
+  /**
+   * Handles focus event on the input field
+   * Sets up scroll listener for infinite scrolling
+   * @param event - The focus event
+   */
+  protected onFocus(event: FocusEvent): void {
+    this.focus.emit(event);
+  }
+
+  /**
+   * Displays the value of an option using the display function
+   * @param option - The option to display
+   * @returns The display value as a string
+   */
+  protected displayValue(option: any): string {
+    return this.displayFn()(option);
+  }
+
+  /**
+   * Track by function for ngFor to improve performance
+   * @param index - The index of the item
+   * @param item - The item itself
+   * @returns A unique identifier for the item
+   */
+  protected trackByFn(index: number, item: any): any {
+    return item.id || index;
+  }
+  // #endregion
+
+  // #region Private Methods
+  /**
+   * Sets up the search observable with proper debouncing and handling
+   */
+  private setupSearch(): void {
+    this.control()
+      .valueChanges
+      .pipe(
+        debounceTime(this.debounceTime()),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe((value) => {
+        if (!this.optionJustSelected()) {
+          this.optionJustSelected.set(true);
+          return;
+        }
+        const term = this.getSearchTermFromValue(value);
+        this.fireSearch({ term, ignoreMinChars: false, isNewSearch: true });
+      });
+  }
+
+  /** Single place to run search logic */
+  private fireSearch(args: { term: string; ignoreMinChars: boolean; isNewSearch: boolean }): void {
+    const { term, ignoreMinChars, isNewSearch } = args;
+    if (!ignoreMinChars && this.minChars() > 0) {
+      if (term.length < this.minChars()) {
+        if (this.options().length > 0) this.clearOptions();
+        return;
+      }
+      else if (!term || term.trim().length === 0) {
+        this.clearOptions();
+        return;
+      }
+    }
+    this.currentSearchTerm.set(term ?? '');
+    this.resetPagination();
+    this.loadMore(isNewSearch);
+  }
+
+  /**
+   * Extracts search term from the control value
+   * @param value - The value from the form control
+   * @returns The search term as a string
+   */
+  private getSearchTermFromValue(value: any): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+    try {
+      if (typeof value === 'object' && this.searchTermKey()) {
+        return value[this.searchTermKey()];
+      };
+      return this.displayFn()(value);
+    } catch (error) {
+      console.warn('Error extracting search term from value:', error);
+      return '';
+    }
+  }
+
+  /**
+   * Clears all options and resets state
+   */
+  private clearOptions(): void {
+    this.options.set([]);
+    this.hasMore.set(false);
+    this.currentPage.set(this.pageIndex());
+    this.apiError.set('');
+  }
+
+  /**
+   * Resets pagination for a new search
+   */
+  private resetPagination(): void {
+    this.options.set([]);
+    this.currentPage.set(this.pageIndex());
+    this.hasMore.set(true);
+    this.apiError.set('');
+  }
+
+  /**
+   * Loads more options with proper state management
+   * @param isNewSearch - Whether this is a new search or pagination request
+   */
+  protected loadMore(isNewSearch: boolean): void {
+    if (this.isLoading() || !this.hasMore()) {
+      return;
+    }
+    this.isLoading.set(true);
+    this.fetchOptions(this.currentSearchTerm(), this.currentPage())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+          next: (response) => {
+            this.isLoading.set(false);
+            if (isNewSearch) {
+              this.options.set(response.options);
+            } else {
+              this.options.update((current) => [...current, ...response.options]);
+            }
+            this.hasMore.set(response.hasMore);
+            if (!isNewSearch) {
+              this.currentPage.update((page) => page + this.pageIndex());
+            } else {
+              this.currentPage.set(this.pageIndex() + 1);
+            }
+            if (this.forceSelection()) {
+              this.control().addValidators(this.forceSelectionValidator(() => this.options()));
+              this.control().updateValueAndValidity({ emitEvent: false });
+            }
+          },
+        error: (error) => {
+          this.resetPagination();
+        }
+      });
+  }
+
+  /**
+   * Fetches options from the API with proper error handling
+   * @param searchTerm - The search term to query
+   * @param page - The page number to fetch
+   * @returns Observable with options and hasMore flag
+   */
+  private fetchOptions(
+    searchTerm: string,
+    page: number
+  ): Observable<{ options: any[]; hasMore: boolean }> {
+    let params = new HttpParams()
+      .set(this.searchQueryParam(), searchTerm)
+      .set(this.pageQueryParam(), page.toString())
+      .set(this.limitQueryParam(), this.pageSize().toString());
+    const additionalParams = this.apiParams();
+    Object.keys(additionalParams).forEach((key) => {
+      const value = additionalParams[key];
+      if (value !== null && value !== undefined) {
+        params = params.set(key, value.toString());
+      }
+    });
+
+    return this.$httpClient.get<any>(this.apiEndpoint(), params).pipe(
+      map((response) => this.processApiResponse(response)),
+      catchError((error) => this.handleApiError(error))
+    );
+  }
+
+  /**
+   * Processes the API response to extract options and hasMore flag
+   * @param response - The API response
+   * @returns Processed response with options and hasMore flag
+   */
+  private processApiResponse(response: any): { options: any[]; hasMore: boolean } {
+    let options: any[] = [];
+    if (this.responseDataPath()) {
+      options = this.getValueByPath(response, this.responseDataPath()) || [];
+    } else {
+      options = Array.isArray(response) ? response : [];
+    }
+    let hasMore = false;
+
+    if (this.responseHasMorePath()) {
+      const moreRecordValue = this.getValueByPath(response, this.responseHasMorePath()) || false;
+      switch (typeof moreRecordValue) {
+        case 'number':
+          hasMore = this.options().length < moreRecordValue;
+          break;
+        case 'boolean':
+          hasMore = moreRecordValue;
+          break;
+        default:
+          hasMore = Boolean(moreRecordValue);
+          break;
+      }
+    } else {
+      hasMore = options.length === this.pageSize();
+    }
+    return { options, hasMore };
+  }
+
+  private getValueByPath(obj: any, path: string): any {
+    const pathParts = path.split('.');
+    return pathParts.reduce((acc, key) => {
+      if (Array.isArray(acc)) {
+        if (!isNaN(Number(key))) {
+          return acc[Number(key)];
+        }
+        return acc.map(item => item && item[key]).filter(v => v !== undefined);
+      }
+      return acc ? acc[key] : undefined;
+    }, obj);
+  }
+
+  /**
+   * Handles API errors and returns a safe fallback
+   * @param error - The error object
+   * @returns Observable with empty options and hasMore false
+   */
+  private handleApiError(error: any): Observable<{ options: any[]; hasMore: boolean }> {
+    this.isLoading.set(false);
+    this.hasMore.set(false);
+    const errorMessage = error.error?.message ||
+      error.message ||
+      'An error occurred while fetching options';
+    this.apiError.set(errorMessage);
+    return of({ options: [], hasMore: false });
+  }
+  // #endregion
+}

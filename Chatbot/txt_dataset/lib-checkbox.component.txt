@@ -1,0 +1,250 @@
+import {Component, input, output, ChangeDetectionStrategy, effect} from '@angular/core';
+import {FormControl, ReactiveFormsModule, Validators} from '@angular/forms';
+import {MatCheckboxModule, MatCheckboxChange} from '@angular/material/checkbox';
+import { MatError } from "@angular/material/form-field";
+import { LibTooltipComponent } from "@saad-ihhn/ihhn-host-lib/lib-tooltip";
+import { CommonModule } from '@angular/common';
+import { ErrorMessagePipe } from '../pipes/lib-error-messages.pipe';
+
+/**
+ * A highly customizable checkbox component built with Angular Material.
+ *
+ * @remarks
+ * This component provides a reusable, accessible checkbox with
+ * reactive forms integration, comprehensive validation, and event handling.
+ *
+ * @example
+ * ```html
+ * <lib-checkbox
+ *   label="Accept Terms"
+ *   [control]="checkboxControl"
+ *   (change)="onCheckboxChange($event)"
+ * ></lib-checkbox>
+ * ```
+ */
+@Component({
+  selector: 'lib-checkbox',
+  standalone: true,
+  imports: [
+    MatCheckboxModule,
+    ReactiveFormsModule,
+    ErrorMessagePipe,
+    MatError,
+    LibTooltipComponent,
+    CommonModule
+],
+  template: `
+    <div [class]="class() || '' + ' lib-checkbox-container'">
+      @if (label() && labelPosition() === 'OutSide') {
+        <label class="lib-mat-label-outside">
+          {{ label() }}
+          @if (control().hasValidator(validatorRequired) && showAsterisk()) {
+            <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+          }
+        </label>
+      }
+      <mat-checkbox
+        class="lib-mat-checkbox"
+        [formControl]="control()"
+        [checked]="checked()"
+        [attr.aria-required]="control().hasValidator(validatorRequired)"
+        [attr.aria-invalid]="control().invalid && control().touched"
+        (change)="onCheckBoxChange($event)"
+        (click)="click.emit($event)"
+        (focus)="focus.emit($event);$event.stopPropagation()"
+        (blur)="blur.emit($event);$event.stopPropagation()"
+      >
+        @if (label() && labelPosition() === 'Inside') {
+          <span class="lib-mat-label-inside">{{ label() }}</span>
+        }
+      </mat-checkbox>
+      <!-- @if creating issue internally break angular content projection -->
+      <!-- @if (control().errors && (control().touched || control().dirty)) {
+        @if (!showErrorIcon()) {
+          <mat-error class="lib-mat-form-field-error">
+            {{ control().errors | errorMessage:label():customErrorMessages() }}
+          </mat-error>
+        } @else {
+          <lib-tooltip (click)="$event.stopImmediatePropagation()" [style.cursor]="'context-menu'" [style.user-select]="'none'" [message]="control().errors | errorMessage:label():customErrorMessages()"
+          class="lib-error-icon material-icons"
+          [ngClass]="{
+            'lib-error-icon-left': errorIconPosition() === 'left',
+            'lib-error-icon-right': errorIconPosition() === 'right'
+          }">
+          error_outline
+          </lib-tooltip>
+        }
+      } -->
+      <!-- @if creating issue internally break angular content projection -->
+      <mat-error class="lib-mat-form-field-error"
+                *ngIf="control().errors && (control().touched || control().dirty) && !showErrorIcon()">
+        {{ control().errors | errorMessage:label():customErrorMessages() }}
+      </mat-error>
+
+      <lib-tooltip *ngIf="control().errors && (control().touched || control().dirty) && showErrorIcon()"
+                  (click)="$event.stopImmediatePropagation()"
+                  [style.cursor]="'context-menu'"
+                  [style.user-select]="'none'"
+                  [message]="control().errors | errorMessage:label():customErrorMessages()"
+                  class="lib-error-icon material-icons"
+                  [ngClass]="{
+                    'lib-error-icon-left': errorIconPosition() === 'left',
+                    'lib-error-icon-right': errorIconPosition() === 'right'
+                  }">
+        error_outline
+      </lib-tooltip>
+    </div>
+  `,
+  styles: [`
+    .lib-checkbox-container {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin: 0.5rem 0;
+    }
+    .lib-mat-label-outside {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    .lib-mat-label-outside-required {
+      color: var(--mat-sys-error);
+      margin-left: 0.3rem;
+    }
+    .lib-mat-checkbox {
+      margin: 0.2rem 0;
+    }
+    .lib-mat-error {
+      font-size: 0.75rem;
+      color: var(--mat-sys-error);
+      margin-top: 0.2rem;
+    }
+    .lib-error-icon {
+      color: var(--mat-sys-error);
+      font-size: 20px;
+      cursor: pointer;
+      position: absolute;
+      top: 0;
+    }
+    .lib-error-icon-left {
+      left: 0;
+    }
+    :host ::ng-deep .lib-error-icon-left span,
+    :host ::ng-deep .lib-error-icon-right span {
+      font-size: 0.8rem !important;
+    }
+    .lib-error-icon-right {
+      right: 0;
+    }
+    .lib-error-tooltip {
+      background-color: #d32f2f !important;
+      color: white !important;
+      font-weight: 500;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibCheckboxComponent {
+  // #region Inputs
+  /**
+   * The text label for the checkbox.
+   * @defaultValue `''`
+   */
+  label = input<string>('');
+
+  /**
+   * Initial checked state (used if no control is provided).
+   * @defaultValue `false`
+   */
+  checked = input<boolean>(false);
+
+  /**
+   * Custom error messages for specific validation errors.
+   * @example
+   * ```typescript
+   * { required: 'You must check this box' }
+   * ```
+   * @defaultValue `{}`
+   */
+  customErrorMessages = input<Record<string, string>>({});
+
+  /**
+   * Position of the label relative to the checkbox.
+   * - 'Inside': Label appears next to the checkbox
+   * - 'OutSide': Label appears above the checkbox
+   * @defaultValue `'Inside'`
+   */
+  labelPosition = input<'Inside' | 'OutSide'>('Inside');
+
+  /**
+   * Whether the checkbox is disabled.
+   * @defaultValue `false`
+   */
+  disabled = input<boolean>(false);
+
+  /**
+   * The FormControl instance managing the checkbox value and validation.
+   * @remarks
+   * This is a required input that must be provided by the parent component.
+   */
+  control = input.required<FormControl>({ alias: 'control' });
+
+  /**
+   * Custom CSS class(es) to apply to the checkbox container.
+   * @defaultValue `''`
+   */
+  class = input<string>('');
+
+  /** Whether to show Asterisk. Default: true */
+  showAsterisk = input<boolean>(true);
+
+  /**
+   * Whether to show error as an icon with tooltip instead of mat-error.
+   * @defaultValue `false`
+   */
+  showErrorIcon = input<boolean>(false);
+
+  /**
+   * Position of the error icon when shown (left or right side of input).
+   * @defaultValue `'left'`
+   */
+  errorIconPosition = input<'left' | 'right'>('right');
+  // #endregion
+
+  // #region Outputs
+  /** Emits when the checkbox state changes */
+  change = output<MatCheckboxChange>();
+  /** Emits when the checkbox gains focus */
+  focus = output<FocusEvent>();
+  /** Emits when the checkbox loses focus */
+  blur = output<FocusEvent>();
+  /** Emits on click events */
+  click = output<MouseEvent>();
+  // #endregion
+  protected validatorRequired = Validators.required;
+
+  constructor() {
+    effect(() => {
+      const control = this.control();
+      const isDisabled = this.disabled();
+      Promise.resolve().then(() => {
+        if (isDisabled && control.enabled) {
+          control.disable({ emitEvent: false });
+        } else if (!isDisabled && control.disabled) {
+          control.enable({ emitEvent: false });
+        }
+      });
+    });
+  }
+
+  /**
+   * Handles checkbox change events
+   * @param event The MatCheckboxChange event
+   */
+  onCheckBoxChange(event: MatCheckboxChange): void {
+    this.change.emit(event);
+  }
+}

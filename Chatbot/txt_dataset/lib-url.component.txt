@@ -1,0 +1,301 @@
+import {Component, input, output, ChangeDetectionStrategy, effect} from '@angular/core';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatFormFieldModule, MatFormFieldAppearance } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { LibTooltipComponent } from '@saad-ihhn/ihhn-host-lib/lib-tooltip';
+import { CommonModule } from '@angular/common';
+import { ErrorMessagePipe } from '../pipes/lib-error-messages.pipe';
+
+/**
+ * A highly customizable URL input component built with Angular Material.
+ *
+ * @remarks
+ * This component provides a reusable, accessible, and feature-rich URL input field
+ * with a globe icon prefix, comprehensive form validation support, and event handling.
+ *
+ * @example
+ * ```html
+ * <lib-url
+ *   label="Website URL"
+ *   [control]="urlControl"
+ *   [appearance]="'fill'"
+ *   [pattern]="urlPattern"
+ *   (keyup.enter)="onSubmit()"
+ * ></lib-url>
+ * ```
+ */
+@Component({
+  selector: 'lib-url',
+  standalone: true,
+  imports: [
+    MatFormFieldModule,
+    MatInputModule,
+    MatIconModule,
+    ReactiveFormsModule,
+    ErrorMessagePipe,
+    LibTooltipComponent,
+    CommonModule
+  ],
+  template: `
+    @if (label() && labelPosition() === 'OutSide') {
+      <mat-label class="lib-mat-label-outside">
+        {{ label() }}
+        @if (control().hasValidator(validatorRequired) && showAsterisk()) {
+          <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+        }
+      </mat-label>
+    }
+    <mat-form-field
+      [class]="class() || '' + ' lib-mat-form-field'"
+      [appearance]="appearance()"
+    >
+      @if (label() && labelPosition() === 'Inside') {
+        <mat-label class="lib-mat-label-inside">{{ label() }}</mat-label>
+      }
+      <mat-icon matPrefix>language</mat-icon>
+      <input
+        [style.padding-left]="showErrorIcon() && errorIconPosition() == 'left' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        [style.padding-right]="showErrorIcon() && errorIconPosition() == 'right' && (control().errors && (control().touched || control().dirty)) ? '20px' : ''"
+        class="lib-mat-form-field-input"
+        matInput
+        type="url"
+        [placeholder]="placeholder()"
+        [formControl]="control()"
+        [attr.pattern]="pattern() || null"
+        [attr.aria-required]="control().hasValidator(validatorRequired)"
+        [attr.aria-invalid]="control().invalid && control().touched"
+        (blur)="blur.emit($event);$event.stopPropagation()"
+        (keyup)="keyUp.emit($event);$event.stopPropagation()"
+        (focus)="focus.emit($event);$event.stopPropagation()"
+        (input)="input.emit($event);$event.stopPropagation()"
+        (change)="change.emit($event);$event.stopPropagation()"
+        (keypress)="keyPress.emit($event);$event.stopPropagation()"
+        (keydown)="keyDown.emit($event);$event.stopPropagation()"
+        (keyup.enter)="enter.emit()"
+        (paste)="paste.emit($event);$event.stopPropagation()"
+        (cut)="cut.emit($event);$event.stopPropagation()"
+        (copy)="copy.emit($event);$event.stopPropagation()"
+        (select)="select.emit($event)"
+        (contextmenu)="contextMenu.emit($event)"
+        (click)="click.emit($event)"
+        (dblclick)="doubleClick.emit($event)"
+        (mousedown)="mouseDown.emit($event)"
+        (mouseup)="mouseUp.emit($event)"
+        (mousemove)="mouseMove.emit($event)"
+        (mouseover)="mouseOver.emit($event)"
+        (mouseout)="mouseOut.emit($event)"
+      />
+      <!-- @if creating issue internally break angular content projection -->
+      <!-- @if (control().errors && (control().touched || control().dirty)) {
+        @if (!showErrorIcon()) {
+          <mat-error class="lib-mat-form-field-error">
+            {{ control().errors | errorMessage:label():customErrorMessages() }}
+          </mat-error>
+        } @else {
+          <lib-tooltip (click)="$event.stopImmediatePropagation()" [style.cursor]="'context-menu'" [style.user-select]="'none'" [message]="control().errors | errorMessage:label():customErrorMessages()"
+          class="lib-error-icon material-icons"
+          [ngClass]="{
+            'lib-error-icon-left': errorIconPosition() === 'left',
+            'lib-error-icon-right': errorIconPosition() === 'right'
+          }">
+          error_outline
+          </lib-tooltip>
+        }
+      } -->
+      <!-- @if creating issue internally break angular content projection -->
+      <mat-error class="lib-mat-form-field-error"
+                *ngIf="control().errors && (control().touched || control().dirty) && !showErrorIcon()">
+        {{ control().errors | errorMessage:label():customErrorMessages() }}
+      </mat-error>
+
+      <lib-tooltip *ngIf="control().errors && (control().touched || control().dirty) && showErrorIcon()"
+                  (click)="$event.stopImmediatePropagation()"
+                  [style.cursor]="'context-menu'"
+                  [style.user-select]="'none'"
+                  [message]="control().errors | errorMessage:label():customErrorMessages()"
+                  class="lib-error-icon material-icons"
+                  [ngClass]="{
+                    'lib-error-icon-left': errorIconPosition() === 'left',
+                    'lib-error-icon-right': errorIconPosition() === 'right'
+                  }">
+        error_outline
+      </lib-tooltip>
+    </mat-form-field>
+  `,
+  styles: [`
+    .lib-mat-label-outside {
+      display: flex;
+      align-items: center;
+      margin-bottom: 0.3rem;
+      font-weight: 500;
+    }
+    .lib-mat-label-outside-required {
+      color: var(--mat-sys-error);
+      margin-left: 0.3rem;
+    }
+    .lib-error-icon {
+      color: var(--mat-sys-error);
+      font-size: 20px;
+      cursor: pointer;
+      position: absolute;
+      top: 0;
+    }
+    .lib-error-icon-left {
+      left: 0;
+    }
+    :host ::ng-deep .lib-error-icon-left span,
+    :host ::ng-deep .lib-error-icon-right span {
+      font-size: 0.8rem !important;
+    }
+    .lib-error-icon-right {
+      right: 0;
+    }
+    .lib-error-tooltip {
+      background-color: #d32f2f !important;
+      color: white !important;
+      font-weight: 500;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibUrlComponent {
+  // #region Inputs
+  /**
+   * The text label for the URL input field.
+   * @defaultValue `'Website URL'`
+   */
+  label = input<string>('Website URL');
+
+  /**
+   * Placeholder text displayed inside the input when empty.
+   * @defaultValue `'Enter website URL'`
+   */
+  placeholder = input<string>('Enter website URL');
+
+  /**
+   * Regex pattern for URL validation.
+   * @defaultValue `''` (no pattern)
+   */
+  pattern = input<string>('');
+
+  /**
+   * Custom error messages for specific validation errors.
+   * @example
+   * ```typescript
+   * { required: 'URL is mandatory', pattern: 'Invalid URL format' }
+   * ```
+   * @defaultValue `{}`
+   */
+  customErrorMessages = input<Record<string, string>>({});
+
+  /**
+   * Material form field appearance style.
+   * @defaultValue `'outline'`
+   */
+  appearance = input<MatFormFieldAppearance>('outline');
+
+  /**
+   * Position of the label relative to the input field.
+   * - 'Inside': Label appears inside the input border
+   * - 'OutSide': Label appears above the input field
+   * @defaultValue `'OutSide'`
+   */
+  labelPosition = input<'Inside' | 'OutSide'>('OutSide');
+
+  /**
+   * Whether the input is disabled.
+   * @defaultValue `false`
+   */
+  disabled = input<boolean>(false);
+
+  /**
+   * The FormControl instance managing the input value and validation.
+   * @remarks
+   * This is a required input that must be provided by the parent component.
+   */
+  control = input.required<FormControl>({ alias: 'control' });
+
+  /**
+   * Custom CSS class(es) to apply to the form field.
+   * @defaultValue `''`
+   */
+  class = input<string>('');
+
+  /** Whether to show Asterisk. Default: true */
+  showAsterisk = input<boolean>(true);
+  
+  /**
+   * Whether to show error as an icon with tooltip instead of mat-error.
+   * @defaultValue `false`
+   */
+  showErrorIcon = input<boolean>(false);
+
+  /**
+   * Position of the error icon when shown (left or right side of input).
+   * @defaultValue `'left'`
+   */
+  errorIconPosition = input<'left' | 'right'>('right');
+  // #endregion
+
+  // #region Outputs
+  /** Emits when the input loses focus */
+  blur = output<FocusEvent>();
+  /** Emits on every keyup event */
+  keyUp = output<KeyboardEvent>();
+  /** Emits when the input gains focus */
+  focus = output<FocusEvent>();
+  /** Emits on any input change */
+  input = output<Event>();
+  /** Emits when the input value changes and loses focus */
+  change = output<Event>();
+  /** Emits on keypress events */
+  keyPress = output<KeyboardEvent>();
+  /** Emits on keydown events */
+  keyDown = output<KeyboardEvent>();
+  /** Emits when the Enter key is pressed */
+  enter = output<void>();
+  /** Emits on paste events */
+  paste = output<ClipboardEvent>();
+  /** Emits on cut events */
+  cut = output<ClipboardEvent>();
+  /** Emits on copy events */
+  copy = output<ClipboardEvent>();
+  /** Emits when text is selected */
+  select = output<Event>();
+  /** Emits on right-click (context menu) events */
+  contextMenu = output<MouseEvent>();
+  /** Emits on single click events */
+  click = output<MouseEvent>();
+  /** Emits on double click events */
+  doubleClick = output<MouseEvent>();
+  /** Emits on mouse button press */
+  mouseDown = output<MouseEvent>();
+  /** Emits on mouse button release */
+  mouseUp = output<MouseEvent>();
+  /** Emits on mouse movement over the input */
+  mouseMove = output<MouseEvent>();
+  /** Emits when the mouse enters the input */
+  mouseOver = output<MouseEvent>();
+  /** Emits when the mouse leaves the input */
+  mouseOut = output<MouseEvent>();
+  // #endregion
+
+  protected validatorRequired = Validators.required;
+
+  constructor() {
+    effect(() => {
+      const control = this.control();
+      const isDisabled = this.disabled();
+      Promise.resolve().then(() => {
+        if (isDisabled && control.enabled) {
+          control.disable({ emitEvent: false });
+        } else if (!isDisabled && control.disabled) {
+          control.enable({ emitEvent: false });
+        }
+      });
+    });
+  }
+}

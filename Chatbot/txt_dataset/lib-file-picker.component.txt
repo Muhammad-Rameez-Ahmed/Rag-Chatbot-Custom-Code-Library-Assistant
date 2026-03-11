@@ -1,0 +1,312 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  input,
+  output,
+  signal,
+  effect,
+} from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+
+@Component({
+  selector: 'lib-file-picker',
+  standalone: true,
+  imports: [CommonModule, MatButtonModule, ReactiveFormsModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+      @if (label() && labelPosition() === 'OutSide') {
+        <label class="lib-mat-label-outside">
+          {{ label() }}
+          @if (control().hasValidator(validatorRequired) && showAsterisk()) {
+            <span class="lib-mat-label-outside-required" aria-hidden="true">*</span>
+          }
+        </label>
+      }
+
+    <div
+      class="picker"
+      [class.dragging]="dragging()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave()"
+      (drop)="onDrop($event)"
+    >
+      <input
+        hidden
+        #fileInput
+        type="file"
+        [accept]="accept()"
+        [multiple]="multiple()"
+        (change)="onSelect($event)"
+      />
+
+      <button mat-stroked-button type="button" (click)="fileInput.click()">
+        Select File{{ multiple() ? 's' : '' }}
+      </button>
+
+      @if (enableDrop()) {
+      <span class="hint">or drag & drop here</span>
+      }
+    </div>
+
+    @if (preview() && files().length) {
+    <div class="preview-grid">
+      @for (item of files(); track item.file.name) {
+      <div class="preview-card">
+        @if (isImage(item.file) && imagePreview()) {
+        <img [src]="item.preview" />
+        } @else {
+        <div class="file-icon">📄</div>
+        }
+
+        <div class="meta">
+          <span class="name">{{ item.file.name }}</span>
+          <small>{{ formatSize(item.file.size) }}</small>
+        </div>
+
+        <button type="button" class="remove" (click)="remove(item)">×</button>
+      </div>
+      }
+    </div>
+    } @if (control().invalid && (control().touched || control().dirty)) {
+    <div class="error">Invalid file selection</div>
+    }
+  `,
+  styles: [
+    `
+      .lib-label {
+        font-weight: 500;
+        margin-bottom: 6px;
+        display: block;
+      }
+      .required {
+        color: red;
+      }
+
+      .picker {
+        border: 1px dashed #ccc;
+        padding: 16px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .picker.dragging {
+        background: #f0f7ff;
+        border-color: #1976d2;
+      }
+
+      .hint {
+        color: #777;
+        font-size: 13px;
+      }
+
+      .preview-grid {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: 12px;
+      }
+
+      .preview-card {
+        position: relative;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        overflow: hidden;
+        padding-bottom: 6px;
+      }
+
+      img {
+        width: 100%;
+        height: 90px;
+        object-fit: cover;
+      }
+
+      .file-icon {
+        height: 90px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+      }
+
+      .meta {
+        padding: 6px;
+        font-size: 12px;
+      }
+
+      .preview-card button {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        border: none;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+
+      .progress {
+        height: 4px;
+        background: #eee;
+      }
+
+      .progress div {
+        height: 100%;
+        background: #1976d2;
+      }
+
+      .error {
+        color: #d32f2f;
+        font-size: 13px;
+      }
+
+      .preview-card {
+        position: relative;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fafafa;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+      }
+
+      .preview-card img {
+        width: 100%;
+        height: 110px;
+        object-fit: cover;
+      }
+
+      .meta {
+        padding: 6px 8px;
+        font-size: 12px;
+      }
+
+      .name {
+        display: block;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .remove {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+    `,
+  ],
+})
+export class LibFilePickerComponent {
+  /** Inputs */
+  label = input('');
+  multiple = input(false);
+  accept = input('*/*');
+  preview = input(true);
+  imagePreview = input(true);
+  enableDrop = input(true);
+  maxFileSizeMB = input(10);
+  maxFiles = input<number | null>(null); // ✅ New input for max files
+  showAsterisk = input<boolean>(true);
+  labelPosition = input<'Inside' | 'OutSide'>('Inside');
+
+  control = input.required<FormControl<File | File[] | null>>();
+  upload = output<File[]>();
+
+  dragging = signal(false);
+  files = signal<PickerFile[]>([]);
+  fileError = signal<string | null>(null);
+
+  protected validatorRequired = Validators.required;
+
+  onSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files) return;
+    this.handleFiles(Array.from(input.files));
+    input.value = '';
+  }
+
+  onDrop(event: DragEvent) {
+    event.preventDefault();
+    this.dragging.set(false);
+    if (!event.dataTransfer?.files) return;
+    this.handleFiles(Array.from(event.dataTransfer.files));
+  }
+
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+    this.dragging.set(true);
+  }
+
+  onDragLeave() {
+    this.dragging.set(false);
+  }
+
+  handleFiles(files: File[]) {
+    // ✅ Check max file count
+    if (this.maxFiles() && this.files().length + files.length > (this.maxFiles() ?? 0)) {
+      this.fileError.set(`You can select maximum ${this.maxFiles()} file(s).`);
+      return;
+    }
+
+    // ✅ Filter by max file size
+    const validFiles = files.filter(f => f.size / 1024 / 1024 <= this.maxFileSizeMB());
+    if (!validFiles.length) {
+      this.fileError.set(`File(s) exceed max size of ${this.maxFileSizeMB()} MB.`);
+      return;
+    }
+
+    // Clear previous error
+    this.fileError.set(null);
+
+    validFiles.forEach(file => {
+      this.createPreview(file).then(preview => {
+        const entry: PickerFile = { file, preview, progress: null };
+        this.files.set(this.multiple() ? [...this.files(), entry] : [entry]);
+        this.control().setValue(
+          this.multiple() ? this.files().map(f => f.file) : entry.file
+        );
+      });
+    });
+
+    this.upload.emit(validFiles);
+  }
+
+  private createPreview(file: File): Promise<string | undefined> {
+    if (!this.isImage(file)) return Promise.resolve(undefined);
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  isImage(file: File): boolean {
+    return file.type.startsWith('image/');
+  }
+
+  remove(item: PickerFile) {
+    this.files.update(f => f.filter(x => x !== item));
+    this.control().setValue(
+      this.multiple() ? this.files().map(f => f.file) : null
+    );
+    this.fileError.set(null); // Clear error on remove
+  }
+
+  formatSize(bytes: number): string {
+    return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+  }
+}
+
+type PickerFile = {
+  file: File;
+  preview?: string;
+  progress: number | null;
+};

@@ -1,0 +1,104 @@
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { FormsModule } from '@angular/forms';
+import { MatIconModule } from '@angular/material/icon';
+import { NgClass } from '@angular/common';
+
+/**
+ * A customizable Angular Material slide toggle component with support for
+ * labels, icons, and theming.
+ */
+@Component({
+  selector: 'lib-mat-slide-toggle',
+  imports: [MatSlideToggleModule, FormsModule, MatIconModule, NgClass],
+  template: `
+    <mat-slide-toggle
+      [color]="color()"
+      [disabled]="disabled()"
+      [checked]="checked()"
+      [class]="className() || ''"
+      [ngClass]="ngClassNames()"
+      (change)="toggleChange.emit($event.checked)"
+    >
+      {{ label() }}
+    </mat-slide-toggle>
+  `,
+  host: {
+    '[style.--icon-content]': 'icon() ? `"\${icon()}\"` : null',
+    '[style.--icon-color]': 'iconColor() ?? null',
+    '[style.--icon-display]': 'icon() ? "none" : "block"'
+  },
+  styles: [`
+    :host ::ng-deep mat-slide-toggle.mat-mdc-slide-toggle > .mat-internal-form-field > button .mdc-switch__icons > svg {
+      display: var(--icon-display, block);
+    }
+    :host ::ng-deep mat-slide-toggle.mat-mdc-slide-toggle>.mat-internal-form-field>button .mdc-switch__icons {
+      position: relative;
+    }
+    :host ::ng-deep mat-slide-toggle.mat-mdc-slide-toggle>.mat-internal-form-field>button .mdc-switch__icons::before {
+      content: var(--icon-content, '');
+      font-family: 'Material Icons';
+      vertical-align: middle;
+      font-size: 0.8em;
+      color: var(--icon-color, "");
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibMatSlideToggleComponent {
+  /**
+   * The theme color of the slide toggle.
+   * Can be 'primary', 'accent', 'warn', or a custom string.
+   * @default 'primary'
+   */
+  readonly color = input<'primary' | 'accent' | 'warn'>('primary');
+
+  /**
+   * Whether the slide toggle is disabled.
+   * @default false
+   */
+  readonly disabled = input<boolean>(false);
+
+  /**
+   * Whether the slide toggle is initially checked.
+   * @default false
+   */
+  readonly checked = input<boolean>(false);
+
+  /**
+   * CSS class or classes to apply to the slide toggle.
+   * @default null
+   */
+  readonly className = input<string | null>(null);
+
+  readonly ngClassNames = input<string | string[] | Set<string> | {[klass: string]: any} | null | undefined>(undefined);
+
+  /**
+   * The label text to display with the slide toggle.
+   * @default null
+   */
+  readonly label = input<string | null>(null);
+
+  /**
+   * The Material icon name to display with the slide toggle.
+   * @default null
+   */
+  readonly icon = input<string | null>(null);
+
+  /**
+   * The Material icon name to display with the slide toggle.
+   * @default null
+   */
+  readonly iconColor = input<string | null>(null);
+
+  /**
+   * Emits when the slide toggle state changes.
+   * Provides the new checked state.
+   */
+  toggleChange = output<boolean>();
+}

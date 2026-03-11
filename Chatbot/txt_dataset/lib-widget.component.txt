@@ -1,0 +1,182 @@
+import { Component, ChangeDetectionStrategy, input, output } from '@angular/core';
+import { CommonModule, NgOptimizedImage } from '@angular/common';
+import { MatIconModule } from '@angular/material/icon';
+import { LibMatIconButtonComponent } from '@saad-ihhn/ihhn-host-lib/lib-buttons';
+import { DynamicResolverPipe } from '@saad-ihhn/ihhn-host-lib/pipes';
+
+/**
+ * A customizable widget container with header and body slots.
+ * Supports configurable icon (image or Angular Material icon),
+ * title, and optional header action buttons.
+ *
+ * Content projection is available via:
+ * - `[widgetHeaderMiddleContent]` — for middle section of header
+ * - `[widgetBody]` — for widget body content
+ */
+@Component({
+  selector: 'lib-widget',
+  standalone: true,
+  imports: [CommonModule, MatIconModule, LibMatIconButtonComponent, NgOptimizedImage, DynamicResolverPipe],
+  template: `
+    <div class="lib-widget">
+      <!-- Widget Header Section -->
+      <div [ngClass]="[widgetHeaderClass(), 'lib-widget-header']">
+        <div class="lib-widget-header-left">
+          @if (iconSourceType() === 'image') {
+            @if (iconSource()) {
+              <img [ngSrc]="iconSource()" alt="interaction icon" width="24" height="24" (click)="onClickHeaderImage.emit()" 
+              [style.cursor]="headerImageClickable() ? 'pointer' : 'default'"/>
+            }
+          } @else {
+            <mat-icon>{{iconSource()}}</mat-icon>
+          }
+          @if (title()) {
+            <h5 class="lib-widget-title">{{title()}}</h5>
+          }
+          <ng-content select="[widgetHeaderStartContent]"></ng-content>
+        </div>
+
+        <div class="lib-widget-header-middle">
+          <ng-content select="[widgetHeaderMiddleContent]"></ng-content>
+        </div>
+
+        <div class="lib-widget-header-right">
+          @for (headerButton of headerButtons(); track headerButton.source) {
+            <lib-mat-icon-button
+              [source]="headerButton.source | dynamicResolverPipe:'':''"
+              [tooltip]="headerButton.tooltip | dynamicResolverPipe:'':''"
+              [tooltipPosition]="headerButton.tooltipPosition | dynamicResolverPipe:'':'below'"
+              [color]="headerButton.color | dynamicResolverPipe:'':''"
+              [className]="headerButton.class | dynamicResolverPipe:'':''"
+              (matClick)="headerButton.onClick?.()"
+              (matDblClick)="headerButton.onDblClick?.()"
+              [sourceType]="headerButton.sourceType | dynamicResolverPipe:'':'icon'">
+            </lib-mat-icon-button>
+          }
+          <ng-content select="[widgetHeaderEndContent]"></ng-content>
+        </div>
+      </div>
+
+      <!-- Widget Body Section -->
+    <div [ngClass]="(widgetBodyClass | dynamicResolverPipe:'':'') + ' lib-widget-body'">
+        <ng-content select="[widgetBody]"></ng-content>
+      </div>
+    </div>
+  `,
+  styles: [`
+    .lib-widget {
+      width: 100%;
+      border: 1px solid var(--mat-sys-surface-container);
+      border-radius: 6px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .lib-widget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      padding: 4px 16px;
+      border-bottom: 1px solid var(--mat-sys-surface-container);
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+      background-color: var(--mat-sys-surface-bright);
+    }
+    .lib-widget-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .lib-widget-title {
+      font-weight: 600;
+    }
+    .lib-widget-header-middle {
+      flex-grow: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .lib-widget-header-right {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+    .lib-widget-body {
+      padding: 16px;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class LibWidgetComponent {
+  /**
+   * Title text displayed in the left section of the widget header.
+   */
+  readonly title = input<string>('title');
+
+  /**
+   * Icon source (image path or Material icon name).
+   * Defaults to an empty string.
+   */
+  readonly iconSource = input<string>('');
+
+  /**
+   * Determines whether the iconSource is rendered as an 'image' or 'icon'.
+   * Defaults to `'image'`.
+   */
+  readonly iconSourceType = input<'image' | 'icon'>('image');
+
+  /**
+   * List of header action buttons to display in the right section of the header.
+   */
+  readonly headerButtons = input<IWidgetHeaderIconButtonConfig[]>([]);
+
+  /**
+   * CSS class to apply to the widget header.
+   * Defaults to an empty string.
+   */
+  readonly widgetHeaderClass = input<string>('');
+
+  /**
+   * CSS class to apply to the widget body.
+   * Defaults to an empty string.
+   */
+  readonly widgetBodyClass = input<string>('');
+
+  onClickHeaderImage = output<void>();
+
+  /**
+ * Enables click interaction on header image.
+ * When true, cursor becomes pointer and click is emitted.
+ */
+  readonly headerImageClickable = input<boolean>(false);
+}
+
+/**
+ * Interface representing a header button displayed in the widget.
+ */
+export interface IWidgetHeaderIconButtonConfig {
+  /** Icon name or image path to render inside the button. */
+  source: string | (() => string);
+
+  /** Tooltip text for the button (optional). */
+  tooltip?: string | (() => string);
+
+  /** Tooltip position (optional). */
+  tooltipPosition?: 'above' | 'below' | 'left' | 'right';
+
+  /** Color of the button (optional). */
+  color?: 'primary' | 'accent' | 'warn' | (() => 'primary' | 'accent' | 'warn');
+
+  /** Indicates whether the source is an image or icon (optional). */
+  sourceType?: 'icon' | 'image' | (() => 'icon' | 'image');
+
+  /** Additional CSS class to apply to the button (optional). */
+  class?: string | (() => string);
+
+  /** OnClick event output for pass a event. */
+  onClick?: () => void;
+
+  /** OnClick event output for pass a event. */
+  onDblClick?: () => void;
+}

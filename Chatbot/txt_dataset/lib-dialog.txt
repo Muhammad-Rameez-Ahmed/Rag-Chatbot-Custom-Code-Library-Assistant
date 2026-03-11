@@ -1,0 +1,347 @@
+import { Signal, Type } from "@angular/core";
+
+/**
+ * Configuration data for the dialog, supporting custom headers, dynamic components, and action buttons.
+ * @template D - The type of data passed to the dynamic component.
+ */
+export interface IDialogData<D = unknown> {
+  /**
+   * The title of the dialog. Can be a string, a Signal returning a string, or a function returning a string.
+   */
+  title: Signal<string> | string | (() => string);
+
+  /**
+   * CSS class(es) to apply to the title element.
+   */
+  titleClass?: Signal<string> | string | (() => string);
+
+  /**
+   * The message content of the dialog. Can be a string, a Signal returning a string, or a function returning a string.
+   */
+  message?: Signal<string> | string | (() => string);
+
+  /**
+   * CSS class(es) to apply to the message element.
+   */
+  messageClass?: Signal<string> | string | (() => string);
+
+  /**
+   * CSS class(es) to apply to the header container element.
+   */
+  headerContainerClass?: Signal<string> | string | (() => string);
+
+  /**
+   * Array of header buttons to display in the dialog header.
+   */
+  headerButtons?: Signal<IDialogHeaderButton[]> | IDialogHeaderButton[];
+
+  /**
+   * Icon to display in the dialog header. Can be a string (icon name), a Signal returning a string, or a function returning a string.
+   */
+  headerIcon?: Signal<string> | string | (() => string);
+
+  /**
+   * CSS class(es) to apply to the header icon element.
+   */
+  headerIconClass?: Signal<string> | string | (() => string);
+
+  /**
+   * Whether to show the close icon in the dialog header.
+   */
+  showCloseIcon?: Signal<boolean> | boolean | (() => boolean);
+
+  /**
+   * CSS class(es) to apply to the close icon element.
+   */
+  closeIconClass?: Signal<string> | string | (() => string);
+
+  /**
+   * Custom content to display in the middle section of the dialog header.
+   */
+  headerMiddleContent?: Signal<any> | any | (() => any);
+
+  /**
+   * CSS class(es) to apply to the header middle content container.
+   */
+  headerMiddleContentClass?: Signal<string> | string | (() => string);
+
+  /**
+   * CSS class(es) to apply to the buttons container in the dialog footer.
+   */
+  buttonsContainerClass?: Signal<string> | string | (() => string);
+
+  /**
+   * Angular component type to render as the main content of the dialog.
+   */
+  component?: Signal<Type<any>> | Type<any>;
+
+  /**
+   * Data to pass to the dynamic component rendered in the dialog.
+   */
+  componentData?: Signal<D> | D;
+
+  /**
+   * Array of action buttons to display in the dialog footer.
+   */
+  actionsButtons?: Signal<IDialogActionButton[]> | IDialogActionButton[];
+}
+
+/**
+ * Configuration for header buttons in the dialog.
+ */
+export interface IDialogHeaderButton {
+  /**
+   * The color theme of the button.
+   */
+  color?: Signal<"primary" | "accent" | "warn"> | "primary" | "accent" | "warn";
+
+  /**
+   * The type of visual element to display (icon or image).
+   */
+  sourceType?: Signal<"icon" | "image"> | "icon" | "image";
+
+  /**
+   * Whether the button is disabled.
+   */
+  disabled?: Signal<boolean> | boolean | (() => boolean);
+
+  /**
+   * The HTML button type attribute.
+   */
+  type?: Signal<"button" | "submit" | "reset"> | "button" | "submit" | "reset";
+
+  /**
+   * CSS class(es) to apply to the button element.
+   */
+  className?: Signal<string> | string | (() => string) | null;
+
+  /**
+   * Badge content to display on the button.
+   */
+  matBadge?: Signal<string> | string | (() => string) | null;
+
+  /**
+   * The source for the button's visual element (icon name or image URL).
+   */
+  source?: Signal<string> | string | (() => string) | null;
+
+  /**
+   * Tooltip text to display when hovering over the button.
+   */
+  tooltip?: Signal<string> | string | (() => string);
+
+  /**
+   * Position of the tooltip relative to the button.
+   */
+  tooltipPosition?: Signal<"above" | "below" | "left" | "right"> | "above" | "below" | "left" | "right";
+
+  /**
+   * Delay in milliseconds before showing the tooltip.
+   */
+  tooltipShowDelay?: Signal<number> | number;
+
+  /**
+   * Delay in milliseconds before hiding the tooltip.
+   */
+  tooltipHideDelay?: Signal<number> | number;
+
+  /**
+   * Whether the tooltip is disabled.
+   */
+  tooltipDisabled?: Signal<boolean> | boolean | (() => boolean) | null;
+
+  /**
+   * Callback function to execute when the button is clicked.
+   */
+  onClick?: () => void;
+
+  /**
+   * Callback function to execute when the button is double-clicked.
+   */
+  onDblClick?: () => void;
+}
+
+/**
+ * Configuration for action buttons in the dialog footer.
+ */
+export interface IDialogActionButton extends IDialogHeaderButton {
+  /**
+   * The Material button variant style.
+   */
+  variant?: Signal<"mat-flat-button" | "mat-raised-button" | "mat-stroked-button" | "mat-button">
+  | "mat-flat-button" | "mat-raised-button" | "mat-stroked-button" | "mat-button";
+
+  /**
+   * The text label to display on the button.
+   */
+  buttonTitle?: Signal<string> | string | (() => string);
+
+  /**
+   * Position of the label relative to the loader (if present).
+   */
+  labelPosition?: Signal<"left" | "right"> | "left" | "right";
+
+  /**
+   * Whether to show a loading indicator on the button.
+   */
+  loader?: Signal<boolean> | boolean | (() => boolean);
+
+  /**
+   * Color of the loading indicator.
+   */
+  loaderColor?: Signal<string> | string;
+
+  /**
+   * Diameter of the loading indicator in pixels.
+   */
+  loaderDiameter?: Signal<number> | number;
+
+  /**
+   * Image source for a custom loading indicator.
+   */
+  loaderImageSrc?: Signal<string> | string | (() => string);
+
+  /**
+   * Mode of the loading indicator (determinate or indeterminate).
+   */
+  loaderMode?: Signal<"determinate" | "indeterminate"> | "determinate" | "indeterminate";
+
+  /**
+   * Current value of the loading indicator (for determinate mode).
+   */
+  loaderValue?: Signal<number> | number | (() => number);
+}
+
+/**
+ * Configuration for opening a dialog, including styling and behavior options.
+ * @template D - The type of data passed to the dynamic component.
+ */
+export interface IDialogConfig<D> extends Partial<IDialogData<D>> {
+  /**
+   * Data to pass to the dynamic component rendered in the dialog.
+   */
+  componentData?: Signal<D> | D;
+
+  /**
+   * Width of the dialog. Can be a CSS value (e.g., '500px', '50%').
+   */
+  width?: Signal<string> | string;
+
+  /**
+   * Height of the dialog. Can be a CSS value (e.g., '300px', '75%').
+   */
+  height?: Signal<string> | string;
+
+  /**
+   * Maximum width of the dialog. Can be a CSS value.
+   */
+  maxWidth?: Signal<string> | string;
+
+  /**
+   * Minimum width of the dialog. Can be a CSS value.
+   */
+  minWidth?: Signal<string> | string;
+
+  /**
+   * Maximum height of the dialog. Can be a CSS value.
+   */
+  maxHeight?: Signal<string> | string;
+
+  /**
+   * Minimum height of the dialog. Can be a CSS value.
+   */
+  minHeight?: Signal<string> | string;
+
+  /**
+   * CSS class(es) to apply to the dialog panel.
+   */
+  panelClass?: Signal<string | string[]> | string | string[];
+
+  /**
+   * Whether to disable closing the dialog via escape key or backdrop click.
+   */
+  disableClose?: Signal<boolean> | boolean;
+
+  /**
+   * Whether to automatically focus the first focusable element in the dialog.
+   */
+  autoFocus?: Signal<boolean> | boolean;
+
+  /**
+   * CSS class(es) to apply to the backdrop element.
+   */
+  backdropClass?: Signal<string> | string;
+
+  /**
+   * Position of the dialog on the screen.
+   */
+  position?: Signal<{
+    top?: string;
+    bottom?: string;
+    left?: string;
+    right?: string;
+  }> | {
+    top?: string;
+    bottom?: string;
+    left?: string;
+    right?: string;
+  };
+
+  /**
+   * Whether to close the dialog when the user navigates (e.g., browser back button).
+   */
+  closeOnNavigation?: Signal<boolean> | boolean;
+
+  /**
+   * Whether to disable closing the dialog by clicking on the backdrop.
+   */
+  disableBackdropClick?: Signal<boolean> | boolean;
+
+  /**
+   * Whether to show a backdrop behind the dialog.
+   */
+  hasBackdrop?: Signal<boolean> | boolean;
+}
+
+/**
+ * Configuration options for customizable modal dialogs.
+ *
+ * @interface IModalOptions
+ *
+ * @property {string} [message]  
+ * The message or body text displayed inside the modal.  
+ * Example: `"Are you sure you want to continue?"`
+ *
+ * @property {string} [okButtonTitle]  
+ * The label for the confirmation or acknowledgment button.  
+ * Default: `'Ok'` (used in info, success, and warning modals)
+ *
+ * @property {string} [cancelButtonTitle]  
+ * The label for the cancel button, used in confirmation or delete modals.  
+ * Default: `'Cancel'` or `'No'` depending on modal type.
+ *
+ * @property {string} [proceedButtonTitle]  
+ * The label for the proceed or confirm button.  
+ * Default: `'Proceed'`
+ *
+ * @property {string} [deleteButtonTitle]  
+ * The label for the delete confirmation button.  
+ * Default: `'Delete'`
+ *
+ * @property {Type<any> | Signal<Type<any>>} [component]  
+ * An optional Angular component or reactive signal-based component to render inside the modal body.  
+ * Useful for embedding custom templates or forms.
+ *
+ * @property {boolean} [disableClose]  
+ * Whether to disable closing the modal via clicking outside or pressing the ESC key.  
+ * Default: `true` for confirmation/delete modals, `false` for info/success modals.
+ */
+export interface IModalOptions {
+  message?: string;
+  okButtonTitle?: string;
+  cancelButtonTitle?: string;
+  proceedButtonTitle?: string;
+  deleteButtonTitle?: string;
+  component?: Type<any> | Signal<Type<any>>;
+  disableClose?: boolean;
+}

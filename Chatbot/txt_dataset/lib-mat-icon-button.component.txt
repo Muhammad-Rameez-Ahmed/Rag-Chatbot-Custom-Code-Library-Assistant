@@ -1,0 +1,158 @@
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { NgOptimizedImage, NgClass } from '@angular/common';
+import { MatIconButton } from '@angular/material/button';
+import { MatBadgeModule } from '@angular/material/badge';
+import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
+
+/**
+ * A reusable Material Design icon button component.
+ * Displays a Material icon, supports theming, badge, tooltip, and emits click events.
+ */
+@Component({
+  selector: 'lib-mat-icon-button',
+  imports: [MatIconButton, MatBadgeModule, MatIconModule, NgOptimizedImage, MatTooltipModule, NgClass],
+  template: `
+    <button
+      mat-icon-button
+      [color]="color()"
+      [disabled]="disabled()"
+      [type]="type()"
+      [class]="(className() || '') + ' lib-mat-icon-button'"
+      [ngClass]="ngClassNames()"
+      (click)="this.matClick.emit();"
+      (dblclick)="this.matDblClick.emit();"
+      [matBadge]="matBadge()"
+      [matTooltip]="tooltip() || ''"
+      [matTooltipPosition]="tooltipPosition()"
+      [matTooltipShowDelay]="tooltipShowDelay()"
+      [matTooltipHideDelay]="tooltipHideDelay()"
+      [matTooltipDisabled]="tooltipDisabled()"
+    >
+      @if (sourceType() == 'icon' && source()) {
+        <mat-icon>{{ source() }}</mat-icon>
+      }
+      @else if (sourceType() == 'image' && source()) {
+      <div class="lib-action-button-container" [ngClass]="{'image-disabled': disabled()}">
+        <img [ngSrc]="source() ?? ''" alt="Loading..." fill />
+      </div>
+      }
+    </button>
+  `,
+  styles: [`
+    .lib-action-button-container {
+      position: relative;
+      width: 20px;
+      height: 20px;
+    }
+    .image-disabled {
+      filter: invert(93%) sepia(10%) saturate(775%) hue-rotate(190deg) brightness(106%) contrast(84%);
+      pointer-events: none;
+    }
+  `],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class LibMatIconButtonComponent {
+  /**
+   * The theme color of the icon button.
+   * Accepts 'primary', 'accent', 'warn', or a custom color string.
+   * @default 'primary'
+   */
+  readonly color = input<'primary' | 'accent' | 'warn' | string>('');
+
+  /**
+   * Source Type of Mat Icon Button mainly two type design
+   * Accepts 'icon', 'image'
+   * Icons must be used only material icons this component support only mat-icon
+   * @default 'icon'
+   */
+  readonly sourceType = input<'icon' | 'image'>('icon');
+
+  /**
+   * Whether the button is disabled.
+   * @default false
+   */
+  readonly disabled = input<boolean | undefined>(false);
+
+  /**
+   * The button's HTML type attribute.
+   * Accepts 'button', 'submit', or 'reset'.
+   * @default 'button'
+   */
+  readonly type = input<'button' | 'submit' | 'reset'>('button');
+
+  /**
+   * Additional CSS class names to apply to the button.
+   * @default null
+   */
+  readonly className = input<string | null>(null);
+
+  readonly ngClassNames = input<string | string[] | Set<string> | {[klass: string]: any} | null | undefined>(undefined);
+
+  /**
+   * Optional badge value to show on the button.
+   * @default null
+   */
+  readonly matBadge = input<string | null>(null);
+
+  /**
+   * Name of the Material icon to display inside the button.
+   * @default null
+   */
+  readonly source = input<string | null>(null);
+
+  /**
+   * The tooltip text to display when hovering over the button.
+   * @default null
+   */
+  readonly tooltip = input<string | null>(null);
+
+  /**
+   * The position of the tooltip relative to the button.
+   * Accepts 'above', 'below', 'left', 'right'.
+   * @default 'below'
+   */
+  readonly tooltipPosition = input<'above' | 'below' | 'left' | 'right'>('below');
+
+  /**
+   * Delay in milliseconds before the tooltip is shown after hovering.
+   * @default 0
+   */
+  readonly tooltipShowDelay = input<number>(0);
+
+  /**
+   * Delay in milliseconds before the tooltip is hidden after leaving.
+   * @default 0
+   */
+  readonly tooltipHideDelay = input<number>(0);
+
+  /**
+   * Whether the tooltip is disabled.
+   * @default false
+   */
+  readonly tooltipDisabled = input<boolean>(false);
+
+  /**
+   * Event emitted when the button is clicked.
+   */
+  matClick = output<void>();
+
+  /**
+   * Event emitted when the button is double clicked.
+   */
+  matDblClick = output<void>();
+
+  /**
+   * Handles button click and emits the matClick event.
+   */
+  onClick(): void {
+    this.matClick.emit();
+  }
+
+  /**
+   * Handles button double click and emits the matDblClick event.
+   */
+  onDblClick(): void {
+    this.matDblClick.emit();
+  }
+}

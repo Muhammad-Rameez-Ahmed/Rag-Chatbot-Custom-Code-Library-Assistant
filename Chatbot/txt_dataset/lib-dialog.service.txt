@@ -1,0 +1,324 @@
+import {
+  ComponentRef,
+  computed,
+  inject,
+  Injectable,
+  Signal,
+  signal,
+  Type,
+  WritableSignal,
+} from '@angular/core';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { Observable } from 'rxjs';
+import { LibDialogComponent } from './lib-dialog.component';
+import { IDialogConfig, IDialogData, IModalOptions } from './lib-dialog';
+import { resolveDynamic } from '@saad-ihhn/ihhn-host-lib/utilis';
+
+/**
+ * Service for opening and managing Angular Material dialogs with customizable configurations
+ * and dynamic component handling.
+ */
+@Injectable({
+  providedIn: 'root',
+})
+export class LibDialogService {
+  private readonly dialog = inject(MatDialog);
+  private dialogStack: WritableSignal<
+    Array<{
+      dialogRef: MatDialogRef<LibDialogComponent>;
+      componentRef?: ComponentRef<any> | null;
+    }>
+  > = signal([]);
+
+  /**
+   * Opens a modal dialog with extensive customization options and manages dynamic components.
+   * @template D - Type of data to be passed to the dialog's dynamic component.
+   * @param config - Configuration object for the dialog.
+   * @returns Observable that emits the dialog's close result.
+   */
+  openDialog<D extends object>(config: IDialogConfig<D> = {}): Observable<any> {
+    const dialogRef = this.dialog.open<LibDialogComponent, IDialogData<D>>(
+      LibDialogComponent,
+      {
+        width: resolveDynamic(config.width) || 'auto',
+        maxWidth: resolveDynamic(config.maxWidth) || '80dvw',
+        minWidth: resolveDynamic(config.minWidth) || '400px',
+        height: resolveDynamic(config.height) || 'auto',
+        maxHeight: resolveDynamic(config.maxHeight) || '90dvh',
+        minHeight: resolveDynamic(config.minHeight) || 'auto',
+        data: {
+          title: resolveDynamic(config.title),
+          titleClass: resolveDynamic(config.titleClass),
+          message: resolveDynamic(config.message),
+          messageClass: resolveDynamic(config.messageClass),
+          headerContainerClass: resolveDynamic(config.headerContainerClass),
+          headerButtons: resolveDynamic(config.headerButtons) || [],
+          headerIcon: resolveDynamic(config.headerIcon),
+          headerIconClass: resolveDynamic(config.headerIconClass),
+          showCloseIcon: resolveDynamic(config.showCloseIcon) ?? false,
+          closeIconClass: resolveDynamic(config.closeIconClass),
+          headerMiddleContent: resolveDynamic(config.headerMiddleContent) || null,
+          headerMiddleContentClass: resolveDynamic(config.headerMiddleContentClass),
+          buttonsContainerClass: resolveDynamic(config.buttonsContainerClass),
+          component: resolveDynamic(config.component) || null,
+          componentData: resolveDynamic(config.componentData),
+          actionsButtons: resolveDynamic(config.actionsButtons) || [],
+        } as IDialogData<D>,
+        panelClass: resolveDynamic(config.panelClass),
+        disableClose:
+          resolveDynamic(config.disableClose) || resolveDynamic(config.disableBackdropClick) || false,
+        autoFocus: resolveDynamic(config.autoFocus) || false,
+        backdropClass: resolveDynamic(config.backdropClass) || '',
+        position: resolveDynamic(config.position) || {},
+        closeOnNavigation: resolveDynamic(config.closeOnNavigation) ?? true,
+        hasBackdrop: resolveDynamic(config.hasBackdrop) ?? !resolveDynamic(config.disableBackdropClick),
+      }
+    );
+    dialogRef.afterOpened().subscribe(() => {
+      const componentRef = dialogRef.componentInstance['componentRef']?.();
+      this.dialogStack.update((stack) => [
+        ...stack,
+        { dialogRef, componentRef },
+      ]);
+      dialogRef.afterClosed().subscribe(() => {
+        componentRef?.destroy();
+        this.dialogStack.update((stack) =>
+          stack.filter((item) => item.dialogRef !== dialogRef)
+        );
+      });
+    });
+    return dialogRef.afterClosed();
+  }
+
+  /**
+   * Closes the current dialog with an optional result.
+   * @param result - The result to pass when closing the dialog.
+   */
+  close<T>(result?: T): void {
+    const currentDialog = this.dialogStack()[this.dialogStack().length - 1];
+    if (currentDialog) {
+      currentDialog.dialogRef.close(result);
+    }
+  }
+
+  /**
+   * Retrieves the instance of the dynamic component in the current dialog.
+   * @template T - The expected type of the component instance.
+   * @returns The component instance or null if none exists.
+   */
+  getCurrentComponentInstance = <T = unknown>() =>
+    computed<T | null>(() => {
+      const currentDialog = this.dialogStack()[this.dialogStack().length - 1];
+      return (currentDialog?.componentRef?.instance as T) ?? null;
+  });
+
+  /**
+   * Opens a dynamic modal dialog based on the provided type and configuration options.
+   *
+   * @param {Object} [params] - Modal configuration options.
+   * @param {'warning' | 'confirmation' | 'delete' | 'success' | 'info'} [params.type='info'] - Type of modal to open.
+   * @param {string} [params.title] - Optional modal title (defaults depend on type).
+   * @param {string} [params.message] - Message content displayed in the modal body.
+   * @param {Type<any> | Signal<Type<any>>} [params.component] - Optional Angular component to render inside the modal.
+   * @param {string} [params.okButtonTitle] - Label for the "OK" or positive action button.
+   * @param {string} [params.cancelButtonTitle] - Label for the cancel button (confirmation/delete modals).
+   * @param {string} [params.proceedButtonTitle] - Label for the proceed/confirm button.
+   * @param {string} [params.deleteButtonTitle] - Label for the delete button in delete modals.
+   * @param {string} [params.itemName] - Name of the item to include in delete confirmation messages.
+   * @param {boolean} [params.disableClose] - Whether closing the modal by clicking outside or pressing ESC is disabled.
+   *
+   * @returns {Observable<any>} Observable that emits the modal result (true/false or custom data).
+   *
+   * @example
+   * // Simple confirmation dialog
+   * this.dialogService.openModal({ type: 'confirmation', message: 'Do you want to save changes?' });
+   *
+   * @example
+   * // Delete confirmation
+   * this.dialogService.openModal({ type: 'delete', itemName: 'Patient Record' });
+   *
+   * @example
+   * // Custom warning dialog
+   * this.dialogService.openModal({
+   *   type: 'warning',
+   *   message: 'This action cannot be undone!',
+   *   okButtonTitle: 'Understood'
+   * });
+   */
+  openModal({
+    type = 'info',
+    title,
+    message,
+    component,
+    okButtonTitle,
+    cancelButtonTitle,
+    proceedButtonTitle,
+    deleteButtonTitle,
+    itemName,
+    disableClose,
+  }: {
+    type?: 'warning' | 'confirmation' | 'delete' | 'success' | 'info';
+    title?: string;
+    message?: string;
+    component?: Type<any> | Signal<Type<any>>;
+    okButtonTitle?: string;
+    cancelButtonTitle?: string;
+    proceedButtonTitle?: string;
+    deleteButtonTitle?: string;
+    itemName?: string;
+    disableClose?: boolean;
+  } = {}): Observable<any> {
+    const modalConfigs: Record<string, any> = {
+      warning: {
+        title: title || 'Warning!',
+        message: message || 'This action is not reversible. Proceed with caution.',
+        headerIcon: 'warning_amber',
+        headerIconClass: 'warning-icon',
+        titleClass: 'warning-title',
+        headerContainerClass: 'warning-header',
+        messageClass: 'warning-message',
+        panelClass: 'warning-dialog',
+        showCloseIcon: false,
+        disableClose: disableClose ?? true,
+        actionsButtons: [
+          {
+            buttonTitle: okButtonTitle || 'Ok',
+            onClick: () => this.close(true),
+            color: 'primary',
+          },
+        ],
+      },
+      confirmation: {
+        title: title || 'Are you sure?',
+        message: message || 'Do you really want to perform this action?',
+        headerIcon: 'help_outline',
+        headerIconClass: 'confirmation-icon',
+        titleClass: 'confirmation-title',
+        headerContainerClass: 'confirmation-header',
+        messageClass: 'confirmation-message',
+        panelClass: 'confirmation-dialog',
+        showCloseIcon: true,
+        disableClose: disableClose ?? true,
+        actionsButtons: [
+          {
+            buttonTitle: cancelButtonTitle || 'Cancel',
+            onClick: () => this.close(false),
+            color: 'warn',
+          },
+          {
+            buttonTitle: proceedButtonTitle || 'Proceed',
+            onClick: () => this.close(true),
+            color: 'primary',
+          },
+        ],
+      },
+      delete: {
+        title: title || 'Confirm Deletion',
+        message: message || `Are you sure you want to delete ${itemName || 'this item'}? This cannot be undone.`,
+        headerIcon: 'delete_forever',
+        headerIconClass: 'delete-icon',
+        titleClass: 'delete-title',
+        headerContainerClass: 'delete-header',
+        messageClass: 'delete-message',
+        panelClass: 'delete-dialog',
+        showCloseIcon: true,
+        disableClose: disableClose ?? true,
+        actionsButtons: [
+          {
+            buttonTitle: cancelButtonTitle || 'No',
+            onClick: () => this.close(false),
+            color: 'primary',
+          },
+          {
+            buttonTitle: deleteButtonTitle || 'Delete',
+            onClick: () => this.close(true),
+            color: 'warn',
+          },
+        ],
+      },
+      success: {
+        title: title || 'Success!',
+        message: message || 'Operation completed successfully!',
+        headerIcon: 'check_circle',
+        headerIconClass: 'success-icon',
+        titleClass: 'success-title',
+        headerContainerClass: 'success-header',
+        messageClass: 'success-message',
+        panelClass: 'success-dialog',
+        showCloseIcon: true,
+        disableClose: disableClose ?? false,
+        actionsButtons: [
+          {
+            buttonTitle: okButtonTitle || 'Ok',
+            onClick: () => this.close(true),
+            color: 'primary',
+          },
+        ],
+      },
+      info: {
+        title: title || 'Information',
+        message: message || 'Here is some important information.',
+        headerIcon: 'info',
+        headerIconClass: 'info-icon',
+        titleClass: 'info-title',
+        headerContainerClass: 'info-header',
+        messageClass: 'info-message',
+        panelClass: 'info-dialog',
+        showCloseIcon: true,
+        disableClose: disableClose ?? false,
+        actionsButtons: [
+          {
+            buttonTitle: okButtonTitle || 'Got it',
+            onClick: () => this.close(true),
+            color: 'primary',
+          },
+        ],
+      },
+    };
+
+    const config = modalConfigs[type];
+    config.component = component;
+    return this.openDialog(config);
+  }
+
+  /**
+   * Opens a predefined warning modal.
+   * @param {IModalOptions} [options] - Optional configuration overrides.
+   */
+  openWarningModal(options?: IModalOptions) {
+    return this.openModal({ type: 'warning', ...options });
+  }
+
+  /**
+   * Opens a predefined confirmation modal.
+   * @param {IModalOptions} [options] - Optional configuration overrides.
+   */
+  openConfirmationModal(options?: IModalOptions) {
+    return this.openModal({ type: 'confirmation', ...options });
+  }
+
+  /**
+   * Opens a predefined delete confirmation modal.
+   * @param {string} [itemName] - Name of the item to include in the confirmation message.
+   * @param {IModalOptions} [options] - Optional configuration overrides.
+   */
+  openDeleteModal(itemName?: string, options?: IModalOptions) {
+    return this.openModal({ type: 'delete', itemName, ...options });
+  }
+
+  /**
+   * Opens a predefined success modal.
+   * @param {IModalOptions} [options] - Optional configuration overrides.
+   */
+  openSuccessModal(options?: IModalOptions) {
+    return this.openModal({ type: 'success', ...options });
+  }
+
+  /**
+   * Opens a predefined informational modal.
+   * @param {IModalOptions} [options] - Optional configuration overrides.
+   */
+  openInfoModal(options?: IModalOptions) {
+    return this.openModal({ type: 'info', ...options });
+  }
+}
