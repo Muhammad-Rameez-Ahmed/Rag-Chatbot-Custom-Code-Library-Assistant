@@ -62,3 +62,8 @@ This assistant helps developers:
 - GitHub repository ingestion
 - Automatic codebase training
 - Web-based chat UI
+
+
+
+https://github.com/user-attachments/assets/5b6868fe-944f-47a3-87ac-32494038d932
+
